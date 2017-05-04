@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package rpc;
+
+import "github.com/hexablock/blockring/structs/structs.proto";
+import "github.com/ipkg/go-chord/net.proto";
+
+service BlockRPC {
+    rpc GetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc SetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc TransferBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+}
+
+service LocateRPC {
+    rpc LocateKeyRPC(LocateRequest) returns (LocateResponse) {}
+    rpc LocateHashRPC(LocateRequest) returns (LocateResponse) {}
+    rpc LocateReplicatedKeyRPC(LocateRequest) returns (LocateResponse) {}
+    rpc LocateReplicatedHashRPC(LocateRequest) returns (LocateResponse) {}
+}
+
+message BlockRPCData{
+    bytes ID = 1;
+    structs.Block Block = 2;
+    structs.Location Location = 3;
+}
+
+message LocateRequest {
+    bytes Key = 1;
+    int32 N = 2;
+}
+
+message LocateResponse {
+    chord.Vnode Predecessor = 1;
+    repeated chord.Vnode Successors = 2;
+    repeated structs.Location Locations = 3;
+}

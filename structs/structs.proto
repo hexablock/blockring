@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package structs;
+
+import "github.com/ipkg/go-chord/net.proto";
+
+enum BlockType {
+    ROOTBLOCK = 0;
+    DATABLOCK = 1;
+}
+
+message Block {
+    BlockType Type = 1;
+    bytes Data = 2;
+}
+
+message Location {
+    bytes Id = 1;
+    chord.Vnode Vnode = 2;
+}
