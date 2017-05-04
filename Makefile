@@ -10,6 +10,10 @@
 clean:
 	go clean -i ./...
 
+deps:
+	[ -e glide ] || curl https://glide.sh/get | sh
+	glide restore
+
 protoc-structs:
 	@rm -f structs/structs.pb.go
 	protoc -I ../../../ -I ./structs ./structs/structs.proto --go_out=plugins=grpc:./structs

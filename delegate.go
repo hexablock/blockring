@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"log"
 
-	"github.com/hexablock/blockring/rpc"
-	"github.com/hexablock/blockring/structs"
 	chord "github.com/ipkg/go-chord"
 
-	"github.com/ipkg/difuse/utils"
+	"github.com/hexablock/blockring/rpc"
+	"github.com/hexablock/blockring/structs"
+	"github.com/hexablock/blockring/utils"
 )
 
 type ChordDelegate struct {
 	Store *StoreTransport
 
-	Ring *ChordRing
+	ring *ChordRing
 	// Incoming candidate blocks to be locally stored i.e. taken over. These are either stored or
 	// forwarded based on location ID
 	InBlocks chan *rpc.BlockRPCData
@@ -24,19 +24,24 @@ func NewChordDelegate(inBlkBufSize int) *ChordDelegate {
 	return &ChordDelegate{InBlocks: make(chan *rpc.BlockRPCData, inBlkBufSize)}
 }
 
+func (s *ChordDelegate) RegisterRing(ring *ChordRing) {
+	s.ring = ring
+	go s.StartConsuming()
+}
+
 // StartConsuming takes incoming blocks and adds them to the local store if they fall within the perview
 // of the host or are transferred to the predecessor.
 func (s *ChordDelegate) StartConsuming() {
 	for b := range s.InBlocks {
 		id := b.Block.ID()
 
-		pred, vn, err := s.Ring.LocateHash(id, 1)
+		pred, vn, err := s.ring.LocateHash(id, 1)
 		if err != nil {
 			log.Println("ERR", err)
 			continue
 		}
 		// re-route to predecessor based on location.Id
-		if bytes.Compare(b.Location.Id, pred.Id) < 0 && pred.Host != s.Ring.Hostname() {
+		if bytes.Compare(b.Location.Id, pred.Id) < 0 && pred.Host != s.ring.Hostname() {
 
 			log.Printf("action=route phase=begin block=%x dst=%s", id, utils.ShortVnodeID(pred))
 			loc := &structs.Location{Id: id, Vnode: pred}

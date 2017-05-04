@@ -1,0 +1,11 @@
+package: github.com/hexablock/blockring
+import:
+- package: github.com/btcsuite/fastsha256
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
+- package: github.com/ipkg/go-chord
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: google.golang.org/grpc
