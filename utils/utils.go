@@ -110,7 +110,7 @@ func LongVnodeID(vn *chord.Vnode) string {
 }
 
 // AutoDetectIPAddress traverses interfaces eliminating, localhost, ifaces with
-// no addresses and ipv6 addresses.  It returns a list by priority
+// no addresses and ipv6 addresses.  It returns a list by priority.
 func AutoDetectIPAddress() ([]string, error) {
 
 	ifaces, err := net.Interfaces()

@@ -28,12 +28,8 @@ func NewChordRing(conf *Config, gserver *grpc.Server) (*ChordRing, error) {
 		err   error
 	)
 
-	if len(conf.Peers) > 0 {
-		if conf.RetryJoin {
-			ring, err = RetryJoinRing(conf, trans)
-		} else {
-			ring, err = joinRing(conf, trans)
-		}
+	if conf.RetryJoin {
+		ring, err = RetryJoinRing(conf, trans)
 	} else {
 		ring, err = JoinRingOrBootstrap(conf, trans)
 	}
@@ -107,20 +103,20 @@ func (cr *ChordRing) NumSuccessors() int {
 	return cr.conf.NumSuccessors
 }
 
-// try joining each peer one by one returning the ring on the first successful join
-func joinRing(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error) {
+// try joining each peer one by one returning the peer and ring on the first successful join
+func joinRing(conf *Config, trans *chord.GRPCTransport) (string, *ChordRing, error) {
 
 	for _, peer := range conf.Peers {
 		log.Printf("Trying peer=%s", peer)
 		ring, err := chord.Join(conf.Chord, trans, peer)
 		if err == nil {
-			return &ChordRing{ring: ring, conf: conf.Chord, trans: trans}, nil
+			return peer, &ChordRing{ring: ring, conf: conf.Chord, trans: trans}, nil
 		}
 		log.Printf("Failed to connect peer=%s msg='%v'", peer, err)
 		<-time.After(1250 * time.Millisecond)
 	}
 
-	return nil, fmt.Errorf("all peers exhausted")
+	return "", nil, fmt.Errorf("all peers exhausted")
 }
 
 // RetryJoinRing implements exponential backoff rejoin.
@@ -136,7 +132,7 @@ func RetryJoinRing(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error)
 			retryInSec *= retryInSec
 		}
 		// try each set of peers
-		ring, err := joinRing(conf, trans)
+		_, ring, err := joinRing(conf, trans)
 		if err == nil {
 			return ring, nil
 		}
@@ -151,7 +147,7 @@ func RetryJoinRing(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error)
 // JoinRingOrBootstrap joins or bootstraps based on config.
 func JoinRingOrBootstrap(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error) {
 	if len(conf.Peers) > 0 {
-		ring, err := joinRing(conf, trans)
+		_, ring, err := joinRing(conf, trans)
 		if err == nil {
 			return ring, nil
 		}

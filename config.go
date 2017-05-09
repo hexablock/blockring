@@ -33,11 +33,13 @@ func DefaultNetTimeouts() *NetTimeouts {
 type Config struct {
 	Chord *chord.Config
 
-	BindAddr  string   // Bind address
-	AdvAddr   string   // Advertise address used by peers
+	BindAddr string // Bind address
+	AdvAddr  string // Advertise address used by peers
+
 	Peers     []string // Existing peers to join
 	RetryJoin bool     // keep trying peers on failure
-	Timeouts  *NetTimeouts
+
+	Timeouts *NetTimeouts
 }
 
 // DefaultConfig returns a sane config
