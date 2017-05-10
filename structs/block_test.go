@@ -5,6 +5,27 @@ import (
 	"testing"
 )
 
+func TestBlock(t *testing.T) {
+	blk := NewDataBlock([]byte("foo"))
+	b, err := blk.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if b == nil || len(b) < 1 {
+		t.Fatal("no data")
+	}
+
+	var b2 Block
+	if err = b2.UnmarshalBinary(b); err != nil {
+		t.Fatal(err)
+	}
+
+	if b2.Type != BlockType_DATABLOCK {
+		t.Fatalf("wrong block type have=%s", b2.Type)
+	}
+}
+
 func TestRootBlock(t *testing.T) {
 	ib := NewRootBlock()
 

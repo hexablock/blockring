@@ -17,6 +17,22 @@ func NewDataBlock(data []byte) *Block {
 	return &Block{Type: BlockType_DATABLOCK, Data: data}
 }
 
+func (blk *Block) MarshalBinary() ([]byte, error) {
+	b := make([]byte, 4)
+	binary.BigEndian.PutUint32(b, uint32(blk.Type))
+	return append([]byte{b[3]}, blk.Data...), nil
+}
+func (blk *Block) UnmarshalBinary(b []byte) error {
+	if len(b) < 2 {
+		return ErrInvalidBlockType
+	}
+
+	t := binary.BigEndian.Uint32([]byte{0, 0, 0, b[0]})
+	blk.Type = BlockType(t)
+	blk.Data = b[1:]
+	return nil
+}
+
 // MarshalJSON custom json marshaller
 func (blk *Block) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{

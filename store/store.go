@@ -11,15 +11,15 @@ var (
 	errNotFound = errors.New("not found")
 )
 
-// NewMemBlockStore instantiates a new in-memory Block store.
-func NewMemBlockStore() *MemBlockStore {
-	return &MemBlockStore{m: make(map[string]*structs.Block)}
-}
-
 // MemBlockStore is an in-memory block store.
 type MemBlockStore struct {
 	mu sync.RWMutex
 	m  map[string]*structs.Block
+}
+
+// NewMemBlockStore instantiates a new in-memory Block store.
+func NewMemBlockStore() *MemBlockStore {
+	return &MemBlockStore{m: make(map[string]*structs.Block)}
 }
 
 // GetBlock returns a block with the given id if it exists
