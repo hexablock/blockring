@@ -7,6 +7,7 @@ import (
 	chord "github.com/ipkg/go-chord"
 
 	"github.com/hexablock/blockring/rpc"
+	"github.com/hexablock/blockring/store"
 	"github.com/hexablock/blockring/structs"
 	"github.com/hexablock/blockring/utils"
 )
@@ -18,10 +19,15 @@ type ChordDelegate struct {
 	// Incoming candidate blocks to be locally stored i.e. taken over. These are either stored or
 	// forwarded based on location ID
 	InBlocks chan *rpc.BlockRPCData
+
+	peerStore store.PeerStore
 }
 
-func NewChordDelegate(inBlkBufSize int) *ChordDelegate {
-	return &ChordDelegate{InBlocks: make(chan *rpc.BlockRPCData, inBlkBufSize)}
+func NewChordDelegate(peerStore store.PeerStore, inBlockBufSize int) *ChordDelegate {
+	return &ChordDelegate{
+		InBlocks:  make(chan *rpc.BlockRPCData, inBlockBufSize),
+		peerStore: peerStore,
+	}
 }
 
 // RegisterRing registers the chord ring to the delegate and starts processing incoming blocks
@@ -96,8 +102,11 @@ func (s *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnode
 		return
 	}
 
+	s.peerStore.AddPeer(remoteNew.Host)
+
 	if err := s.transferBlocks(local, remoteNew); err != nil {
-		log.Printf("ERR action=transfer-blocks local=%s remote=%s", utils.ShortVnodeID(local), utils.ShortVnodeID(remoteNew))
+		log.Printf("ERR action=transfer-blocks local=%s remote=%s",
+			utils.ShortVnodeID(local), utils.ShortVnodeID(remoteNew))
 	}
 
 }

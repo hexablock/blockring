@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/hexablock/blockring/store"
 	chord "github.com/ipkg/go-chord"
 )
 
@@ -29,7 +30,9 @@ func initChordRing(addr string, peers ...string) (*ChordRing, error) {
 
 	trans := chord.NewGRPCTransport(svr, conf.Timeouts.RPC, conf.Timeouts.Idle)
 
-	return JoinRingOrBootstrap(conf, trans)
+	ps := store.NewPeerInMemStore()
+
+	return joinRingOrBootstrap(conf, ps, trans)
 }
 
 func TestChordRingBootstrap(t *testing.T) {
@@ -80,7 +83,6 @@ func TestChordRingJoin(t *testing.T) {
 	if !f1 {
 		t.Fatal("all local vnodes")
 	}
-
 }
 
 func initConfig(addr string) (*Config, error) {

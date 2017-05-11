@@ -13,22 +13,6 @@ import (
 	"github.com/hexablock/blockring/utils"
 )
 
-// NetTimeouts holds timeouts for rpc's
-type NetTimeouts struct {
-	Dial time.Duration
-	RPC  time.Duration
-	Idle time.Duration
-}
-
-// DefaultNetTimeouts initializes sane timeouts
-func DefaultNetTimeouts() *NetTimeouts {
-	return &NetTimeouts{
-		Dial: 3 * time.Second,
-		RPC:  5 * time.Second,
-		Idle: 300 * time.Second,
-	}
-}
-
 // Config holds the overall config
 type Config struct {
 	Chord *chord.Config
@@ -39,7 +23,8 @@ type Config struct {
 	Peers     []string // Existing peers to join
 	RetryJoin bool     // keep trying peers on failure
 
-	Timeouts *NetTimeouts
+	Timeouts       *NetTimeouts
+	InBlockBufSize int
 }
 
 // DefaultConfig returns a sane config
@@ -54,6 +39,8 @@ func DefaultConfig() *Config {
 	c.Chord.StabilizeMin = 3 * time.Second
 	c.Chord.StabilizeMax = 8 * time.Second
 	c.Chord.HashFunc = func() hash.Hash { return fastsha256.New() }
+
+	c.InBlockBufSize = c.Chord.NumSuccessors * c.Chord.NumVnodes
 
 	return c
 }
@@ -103,4 +90,20 @@ func (cfg *Config) validateAddrs() error {
 	cfg.Chord.Hostname = cfg.AdvAddr
 
 	return nil
+}
+
+// NetTimeouts holds timeouts for rpc's
+type NetTimeouts struct {
+	Dial time.Duration
+	RPC  time.Duration
+	Idle time.Duration
+}
+
+// DefaultNetTimeouts initializes sane timeouts
+func DefaultNetTimeouts() *NetTimeouts {
+	return &NetTimeouts{
+		Dial: 3 * time.Second,
+		RPC:  5 * time.Second,
+		Idle: 300 * time.Second,
+	}
 }

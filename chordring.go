@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/hexablock/blockring/store"
 	"github.com/hexablock/blockring/structs"
 	"github.com/hexablock/blockring/utils"
 	chord "github.com/ipkg/go-chord"
@@ -14,13 +15,14 @@ import (
 
 // ChordRing contains
 type ChordRing struct {
-	conf  *chord.Config
-	trans *chord.GRPCTransport
-	ring  *chord.Ring
+	conf      *chord.Config
+	trans     *chord.GRPCTransport
+	ring      *chord.Ring
+	peerStore store.PeerStore
 }
 
 // NewChordRing instantiates new ChordRing struct joining or creating a ring based on the configuration.
-func NewChordRing(conf *Config, gserver *grpc.Server) (*ChordRing, error) {
+func NewChordRing(conf *Config, peerStore store.PeerStore, gserver *grpc.Server) (*ChordRing, error) {
 
 	var (
 		trans = chord.NewGRPCTransport(gserver, conf.Timeouts.RPC, conf.Timeouts.Idle)
@@ -29,9 +31,9 @@ func NewChordRing(conf *Config, gserver *grpc.Server) (*ChordRing, error) {
 	)
 
 	if conf.RetryJoin {
-		ring, err = RetryJoinRing(conf, trans)
+		ring, err = retryJoinRing(conf, peerStore, trans)
 	} else {
-		ring, err = JoinRingOrBootstrap(conf, trans)
+		ring, err = joinRingOrBootstrap(conf, peerStore, trans)
 	}
 
 	if err == nil {
@@ -103,14 +105,34 @@ func (cr *ChordRing) NumSuccessors() int {
 	return cr.conf.NumSuccessors
 }
 
-// try joining each peer one by one returning the peer and ring on the first successful join
-func joinRing(conf *Config, trans *chord.GRPCTransport) (string, *ChordRing, error) {
+func dedup(list []string) []string {
+	m := map[string]int{}
+	for i, l := range list {
+		m[l] = i
+	}
 
-	for _, peer := range conf.Peers {
+	o := make([]string, len(m))
+	i := 0
+	for k := range m {
+		o[i] = k
+		i++
+	}
+	return o
+}
+
+// try joining each peer one by one returning the peer and ring on the first successful join
+func joinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (string, *ChordRing, error) {
+
+	peers := append(peerStore.Peers(), conf.Peers...)
+	peers = dedup(peers)
+
+	for _, peer := range peers {
 		log.Printf("Trying peer=%s", peer)
 		ring, err := chord.Join(conf.Chord, trans, peer)
 		if err == nil {
-			return peer, &ChordRing{ring: ring, conf: conf.Chord, trans: trans}, nil
+			cr := &ChordRing{ring: ring, conf: conf.Chord, trans: trans, peerStore: peerStore}
+			cr.peerStore.AddPeer(peer)
+			return peer, cr, nil
 		}
 		log.Printf("Failed to connect peer=%s msg='%v'", peer, err)
 		<-time.After(1250 * time.Millisecond)
@@ -120,7 +142,7 @@ func joinRing(conf *Config, trans *chord.GRPCTransport) (string, *ChordRing, err
 }
 
 // RetryJoinRing implements exponential backoff rejoin.
-func RetryJoinRing(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error) {
+func retryJoinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (*ChordRing, error) {
 
 	retryInSec := 2
 	tries := 0
@@ -132,7 +154,7 @@ func RetryJoinRing(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error)
 			retryInSec *= retryInSec
 		}
 		// try each set of peers
-		_, ring, err := joinRing(conf, trans)
+		_, ring, err := joinRing(conf, peerStore, trans)
 		if err == nil {
 			return ring, nil
 		}
@@ -145,9 +167,9 @@ func RetryJoinRing(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error)
 }
 
 // JoinRingOrBootstrap joins or bootstraps based on config.
-func JoinRingOrBootstrap(conf *Config, trans *chord.GRPCTransport) (*ChordRing, error) {
+func joinRingOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (*ChordRing, error) {
 	if len(conf.Peers) > 0 {
-		_, ring, err := joinRing(conf, trans)
+		_, ring, err := joinRing(conf, peerStore, trans)
 		if err == nil {
 			return ring, nil
 		}
@@ -157,7 +179,7 @@ func JoinRingOrBootstrap(conf *Config, trans *chord.GRPCTransport) (*ChordRing, 
 	log.Printf("Starting mode=bootstrap hostname=%s", conf.Chord.Hostname)
 	ring, err := chord.Create(conf.Chord, trans)
 	if err == nil {
-		return &ChordRing{ring: ring, conf: conf.Chord, trans: trans}, nil
+		return &ChordRing{ring: ring, conf: conf.Chord, trans: trans, peerStore: peerStore}, nil
 	}
 	return nil, err
 }

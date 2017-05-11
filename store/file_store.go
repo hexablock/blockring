@@ -15,9 +15,7 @@ type FileBlockStore struct {
 }
 
 func NewFileBlockStore(datadir string) *FileBlockStore {
-	fbs := &FileBlockStore{datadir: datadir, defaultSetPerm: 0644}
-	os.MkdirAll(fbs.datadir, 0755)
-	return fbs
+	return &FileBlockStore{datadir: datadir, defaultSetPerm: 0644}
 }
 
 func (st *FileBlockStore) abspath(p string) string {
@@ -41,6 +39,10 @@ func (st *FileBlockStore) IterBlocks(f func(block *structs.Block) error) error {
 
 	for _, fl := range files {
 		if fl.IsDir() {
+			continue
+		}
+
+		if _, er := hex.DecodeString(fl.Name()); er != nil {
 			continue
 		}
 
