@@ -12,8 +12,8 @@ type LookupServiceClient struct {
 	out *pool.OutConnPool
 }
 
-func NewLookupServiceClient() *LookupServiceClient {
-	return &LookupServiceClient{out: pool.NewOutConnPool(30, 180)}
+func NewLookupServiceClient(reapInterval, maxIdle int) *LookupServiceClient {
+	return &LookupServiceClient{out: pool.NewOutConnPool(reapInterval, maxIdle)}
 }
 
 func (ls *LookupServiceClient) LocateBlock(host string, id []byte) ([]*structs.Location, error) {

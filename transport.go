@@ -24,7 +24,11 @@ type StoreTransport struct {
 
 func NewStoreTransport(hostname string, local Store, remote Transport) *StoreTransport {
 	//remote.RegisterStore(local)
-	return &StoreTransport{host: hostname, local: local, remote: remote}
+	st := &StoreTransport{host: hostname, local: local, remote: remote}
+	if st.remote == nil {
+		st.remote = NewNetTransportClient(30, 180)
+	}
+	return st
 }
 
 func (t *StoreTransport) GetBlock(loc *structs.Location, id []byte) (*structs.Block, error) {

@@ -12,8 +12,8 @@ type NetTransportClient struct {
 	out *pool.OutConnPool
 }
 
-func NewNetTransportClient() *NetTransportClient {
-	return &NetTransportClient{out: pool.NewOutConnPool(30, 180)}
+func NewNetTransportClient(reapInterval, maxIdle int) *NetTransportClient {
+	return &NetTransportClient{out: pool.NewOutConnPool(reapInterval, maxIdle)}
 }
 
 func (s *NetTransportClient) GetBlock(loc *structs.Location, id []byte) (*structs.Block, error) {
