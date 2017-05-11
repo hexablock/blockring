@@ -63,8 +63,13 @@ func (cfg *Config) SetPeers(peers string) {
 	cfg.Peers = utils.StringToSlice(peers, ",")
 }
 
+// Validate validates the config
+func (cfg *Config) Validate() error {
+	return cfg.validateAddrs()
+}
+
 // ValidateAddrs validates both bind and adv addresses and set adv if possible.
-func (cfg *Config) ValidateAddrs() error {
+func (cfg *Config) validateAddrs() error {
 	if _, err := net.ResolveTCPAddr("tcp4", cfg.BindAddr); err != nil {
 		return err
 	}

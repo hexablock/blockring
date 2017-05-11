@@ -88,8 +88,7 @@ func initConfig(addr string) (*Config, error) {
 	c1.Chord.StabilizeMin = 3 * time.Second
 	c1.Chord.StabilizeMax = 10 * time.Second
 	c1.BindAddr = addr
-
-	err := c1.ValidateAddrs()
+	err := c1.Validate()
 	return c1, err
 }
 

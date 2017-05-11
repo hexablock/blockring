@@ -15,19 +15,20 @@ func TestConfigSetPeers(t *testing.T) {
 
 }
 
-func TestConfigValidateAddrs(t *testing.T) {
+func TestConfigValidate(t *testing.T) {
 	cfg := DefaultConfig()
 
 	cfg.BindAddr = "127.0.0.1:12345"
-	if err := cfg.ValidateAddrs(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
+
 	if cfg.BindAddr != cfg.AdvAddr {
 		t.Fatal("bind & adv should be the same")
 	}
 
 	cfg.BindAddr = ":3245"
-	if err := cfg.ValidateAddrs(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	if len(cfg.AdvAddr) == 0 {
@@ -35,19 +36,19 @@ func TestConfigValidateAddrs(t *testing.T) {
 	}
 
 	cfg.AdvAddr = "127.0.0.1:1234"
-	if err := cfg.ValidateAddrs(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	cfg.AdvAddr = "0.0.0.0:1234"
-	if err := cfg.ValidateAddrs(); err == nil {
+	if err := cfg.Validate(); err == nil {
 		t.Error("should fail")
 	}
 	cfg.AdvAddr = ":1234"
-	if err := cfg.ValidateAddrs(); err == nil {
+	if err := cfg.Validate(); err == nil {
 		t.Error("should fail")
 	}
 	cfg.AdvAddr = ""
-	if err := cfg.ValidateAddrs(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasSuffix(cfg.AdvAddr, ":3245") {
