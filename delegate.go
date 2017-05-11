@@ -24,14 +24,15 @@ func NewChordDelegate(inBlkBufSize int) *ChordDelegate {
 	return &ChordDelegate{InBlocks: make(chan *rpc.BlockRPCData, inBlkBufSize)}
 }
 
+// RegisterRing registers the chord ring to the delegate and starts processing incoming blocks
 func (s *ChordDelegate) RegisterRing(ring *ChordRing) {
 	s.ring = ring
-	go s.StartConsuming()
+	go s.startConsuming()
 }
 
 // StartConsuming takes incoming blocks and adds them to the local store if they fall within the perview
 // of the host or are transferred to the predecessor.
-func (s *ChordDelegate) StartConsuming() {
+func (s *ChordDelegate) startConsuming() {
 	for b := range s.InBlocks {
 		id := b.Block.ID()
 
@@ -40,7 +41,9 @@ func (s *ChordDelegate) StartConsuming() {
 			log.Println("ERR", err)
 			continue
 		}
+
 		// re-route to predecessor based on location.Id
+		// TODO: re-visit to ensure we are properly routing key replicas
 		if bytes.Compare(b.Location.Id, pred.Id) < 0 && pred.Host != s.ring.Hostname() {
 
 			log.Printf("action=route phase=begin block=%x dst=%s", id, utils.ShortVnodeID(pred))
