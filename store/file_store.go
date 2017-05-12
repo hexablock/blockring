@@ -15,7 +15,7 @@ type FileBlockStore struct {
 }
 
 func NewFileBlockStore(datadir string) *FileBlockStore {
-	return &FileBlockStore{datadir: datadir, defaultSetPerm: 0644}
+	return &FileBlockStore{datadir: datadir, defaultSetPerm: 0444}
 }
 
 func (st *FileBlockStore) abspath(p string) string {
@@ -69,6 +69,9 @@ func (st *FileBlockStore) SetBlock(blk *structs.Block) error {
 func (st *FileBlockStore) writeBlockToFile(blk *structs.Block) error {
 	bid := blk.ID()
 	fp := st.abspath(hex.EncodeToString(bid))
+	if _, err := os.Stat(fp); err == nil {
+		return nil
+	}
 	// TODO: don't write block if it exists
 	data, _ := blk.MarshalBinary()
 	return ioutil.WriteFile(fp, data, st.defaultSetPerm)

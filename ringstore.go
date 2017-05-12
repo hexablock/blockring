@@ -27,10 +27,18 @@ func (br *RingStore) SetBlock(block *structs.Block) ([]*LocationResponse, error)
 	}
 
 	out := make([]*LocationResponse, len(locs))
-	for i, loc := range locs {
-		out[i] = &LocationResponse{Location: loc}
-		out[i].Data = br.Store.SetBlock(loc, block)
+	out[0] = &LocationResponse{Location: locs[0]}
+	out[0].Data = br.Store.SetBlock(locs[0], block)
+
+	// set block replicas
+	if br.Replicas > 1 {
+		for i := 1; i < len(locs); i++ {
+			out[i] = &LocationResponse{Location: locs[i]}
+			out[i].Data = br.Store.SetBlock(locs[i], block)
+		}
+
 	}
+
 	return out, nil
 }
 

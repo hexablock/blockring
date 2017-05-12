@@ -105,21 +105,6 @@ func (cr *ChordRing) NumSuccessors() int {
 	return cr.conf.NumSuccessors
 }
 
-func dedup(list []string) []string {
-	m := map[string]int{}
-	for i, l := range list {
-		m[l] = i
-	}
-
-	o := make([]string, len(m))
-	i := 0
-	for k := range m {
-		o[i] = k
-		i++
-	}
-	return o
-}
-
 // try joining each peer one by one returning the peer and ring on the first successful join
 func joinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (string, *ChordRing, error) {
 
@@ -182,4 +167,19 @@ func joinRingOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.G
 		return &ChordRing{ring: ring, conf: conf.Chord, trans: trans, peerStore: peerStore}, nil
 	}
 	return nil, err
+}
+
+func dedup(list []string) []string {
+	m := map[string]int{}
+	for i, l := range list {
+		m[l] = i
+	}
+
+	o := make([]string, len(m))
+	i := 0
+	for k := range m {
+		o[i] = k
+		i++
+	}
+	return o
 }

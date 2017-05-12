@@ -78,6 +78,8 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 	return s.Store.local.IterBlocks(func(block *structs.Block) error {
 		id := block.ID()
 
+		// TODO: handle replicas
+
 		if bytes.Compare(id, remote.Id) < 0 {
 			log.Printf("action=transfer phase=begin block=%x dst=%s", id, utils.ShortVnodeID(remote))
 

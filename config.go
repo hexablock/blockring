@@ -35,7 +35,7 @@ func DefaultConfig() *Config {
 	}
 
 	c.Chord.NumSuccessors = 7
-	c.Chord.NumVnodes = 8
+	c.Chord.NumVnodes = 3
 	c.Chord.StabilizeMin = 3 * time.Second
 	c.Chord.StabilizeMax = 8 * time.Second
 	c.Chord.HashFunc = func() hash.Hash { return fastsha256.New() }

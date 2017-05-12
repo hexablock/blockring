@@ -109,7 +109,7 @@ func (ps *PeerJSONStore) AddPeer(peer string) bool {
 // Commit writes the in-memory peer list to the stable store.
 func (ps *PeerJSONStore) Commit() error {
 	ps.mu.RLock()
-	b, err := json.Marshal(ps.peers)
+	b, err := json.MarshalIndent(ps.peers, "", "  ")
 	ps.mu.RUnlock()
 	if err == nil {
 		err = ioutil.WriteFile(ps.filename, b, ps.perms)
