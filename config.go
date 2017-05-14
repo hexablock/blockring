@@ -13,6 +13,8 @@ import (
 	"github.com/hexablock/blockring/utils"
 )
 
+const defaultNumSuccessors = 7
+
 // Config holds the overall config
 type Config struct {
 	Chord *chord.Config
@@ -34,10 +36,10 @@ func DefaultConfig() *Config {
 		Timeouts: DefaultNetTimeouts(),
 	}
 
-	c.Chord.NumSuccessors = 7
+	c.Chord.NumSuccessors = defaultNumSuccessors
 	c.Chord.NumVnodes = 3
 	c.Chord.StabilizeMin = 3 * time.Second
-	c.Chord.StabilizeMax = 8 * time.Second
+	c.Chord.StabilizeMax = 10 * time.Second
 	c.Chord.HashFunc = func() hash.Hash { return fastsha256.New() }
 
 	c.InBlockBufSize = c.Chord.NumSuccessors * c.Chord.NumVnodes

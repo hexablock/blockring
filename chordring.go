@@ -55,13 +55,13 @@ func (cr *ChordRing) Vnodes(host string) ([]*chord.Vnode, error) {
 	return cr.trans.ListVnodes(host)
 }
 
-// LocateKey returns the key hash, pred. vnode, n succesor vnodes
-func (cr *ChordRing) LocateKey(key []byte, n int) ([]byte, *chord.Vnode, []*chord.Vnode, error) {
+// LookupKey returns the key hash, pred. vnode, n succesor vnodes
+func (cr *ChordRing) LookupKey(key []byte, n int) ([]byte, *chord.Vnode, []*chord.Vnode, error) {
 	return cr.ring.Lookup(n, key)
 }
 
-// LocateHash returns the pred. vnode, n succesor vnodes
-func (cr *ChordRing) LocateHash(hash []byte, n int) (*chord.Vnode, []*chord.Vnode, error) {
+// LookupHash returns the pred. vnode, n succesor vnodes
+func (cr *ChordRing) LookupHash(hash []byte, n int) (*chord.Vnode, []*chord.Vnode, error) {
 	return cr.ring.LookupHash(n, hash)
 }
 

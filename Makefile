@@ -1,12 +1,4 @@
 
-#BRANCH = $(shell git rev-parse --abbrev-ref HEAD || echo unknown)
-#COMMIT = $(shell git rev-parse --short HEAD || echo unknown)
-#BUILDTIME = $(shell date +%Y-%m-%dT%T%z)
-
-#LD_OPTS = -ldflags="-X main.branch=${BRANCH} -X main.commit=${COMMIT} -X main.buildtime=${BUILDTIME} -w"
-#LD_OPTS = -ldflags="-X difuse.version=${VERSION} -w"
-#BUILD_CMD = CGO_ENABLED=0 go build -a -tags netgo -installsuffix netgo
-
 clean:
 	go clean -i ./...
 

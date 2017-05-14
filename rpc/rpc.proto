@@ -12,10 +12,11 @@ service BlockRPC {
 }
 
 service LocateRPC {
-    rpc LocateKeyRPC(LocateRequest) returns (LocateResponse) {}
-    rpc LocateHashRPC(LocateRequest) returns (LocateResponse) {}
+    rpc LookupKeyRPC(LocateRequest) returns (LocateResponse) {}
+    rpc LookupHashRPC(LocateRequest) returns (LocateResponse) {}
     rpc LocateReplicatedKeyRPC(LocateRequest) returns (LocateResponse) {}
     rpc LocateReplicatedHashRPC(LocateRequest) returns (LocateResponse) {}
+    rpc NegotiateRPC(NegotiateRequest) returns (NegotiateResponse) {}
 }
 
 message BlockRPCData{
@@ -30,7 +31,18 @@ message LocateRequest {
 }
 
 message LocateResponse {
-    chord.Vnode Predecessor = 1;
-    repeated chord.Vnode Successors = 2;
-    repeated structs.Location Locations = 3;
+    bytes KeyHash = 1;
+    chord.Vnode Predecessor = 2;
+    repeated chord.Vnode Successors = 3;
+    repeated structs.Location Locations = 4;
+}
+
+message NegotiateRequest {
+    bytes Key = 1;
+}
+
+message NegotiateResponse {
+    int32 Successors = 1;
+    int32 Vnodes = 2;
+    repeated string Peers = 3;
 }

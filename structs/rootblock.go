@@ -24,6 +24,10 @@ func NewRootBlock() *RootBlock {
 	return &RootBlock{ids: make(map[uint64][]byte)}
 }
 
+func (idx *RootBlock) Len() int {
+	return len(idx.ids)
+}
+
 func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
 		"Type": BlockType_ROOTBLOCK,
@@ -65,6 +69,10 @@ func (idx *RootBlock) Iter(f func(index uint64, id []byte) error) error {
 	}
 
 	return nil
+}
+
+func (idx *RootBlock) ID() []byte {
+	return idx.EncodeBlock().ID()
 }
 
 // EncodeBlock encodes the RootBlock into a Block

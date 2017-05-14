@@ -1,6 +1,14 @@
 package blockring
 
-import "github.com/hexablock/blockring/structs"
+import (
+	"errors"
+
+	"github.com/hexablock/blockring/structs"
+)
+
+var (
+	errNoLocalTransfer = errors.New("local transfers not allowed")
+)
 
 type Store interface {
 	GetBlock(id []byte) (*structs.Block, error)
@@ -45,4 +53,11 @@ func (t *StoreTransport) SetBlock(loc *structs.Location, block *structs.Block) e
 	}
 
 	return t.remote.SetBlock(loc, block)
+}
+
+func (t *StoreTransport) TransferBlock(loc *structs.Location, block *structs.Block) error {
+	if loc.Vnode.Host == t.host {
+		return errNoLocalTransfer
+	}
+	return t.remote.TransferBlock(loc, block)
 }

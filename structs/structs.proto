@@ -16,5 +16,6 @@ message Block {
 
 message Location {
     bytes Id = 1;
-    chord.Vnode Vnode = 2;
+    int32 Priority = 2;
+    chord.Vnode Vnode = 3;
 }

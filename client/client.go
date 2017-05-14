@@ -7,21 +7,24 @@ import (
 	"github.com/hexablock/blockring"
 	"github.com/hexablock/blockring/structs"
 	"github.com/hexablock/blockring/utils"
+	chord "github.com/ipkg/go-chord"
 )
 
 // Config is the client configuration
 type Config struct {
-	ReapInterval int      // interval at which outbound connections should be reaped.
-	MaxIdle      int      // idle before a connection can be reaped.
-	Peers        []string // initial set of peers.
+	ReapInterval  int      // interval at which outbound connections should be reaped.
+	MaxIdle       int      // idle before a connection can be reaped.
+	Peers         []string // initial set of peers.
+	MaxSuccessors int
 }
 
 // DefaultConfig returns a sane client config
 func DefaultConfig() *Config {
 	return &Config{
-		ReapInterval: 30,
-		MaxIdle:      300,
-		Peers:        []string{},
+		ReapInterval:  30,
+		MaxIdle:       300,
+		Peers:         []string{},
+		MaxSuccessors: 3,
 	}
 }
 
@@ -32,10 +35,9 @@ func (conf *Config) SetPeers(peers string) {
 
 // Client is a client connecting to the core cluster
 type Client struct {
-	conf *Config
-
-	store  *blockring.NetTransportClient
+	conf   *Config
 	locate *blockring.LookupServiceClient
+	rs     *blockring.BlockRing
 }
 
 // NewClient instantiates a new client
@@ -46,9 +48,21 @@ func NewClient(conf *Config) (*Client, error) {
 
 	c := &Client{
 		conf:   conf,
-		store:  blockring.NewNetTransportClient(conf.ReapInterval, conf.MaxIdle),
 		locate: blockring.NewLookupServiceClient(conf.ReapInterval, conf.MaxIdle),
 	}
+
+	resp, err := c.locate.Negotiate(c.GetPeer())
+	if err != nil {
+		return nil, err
+	}
+
+	isucc := int(resp.Successors)
+	if conf.MaxSuccessors == 0 || conf.MaxSuccessors > isucc {
+		c.conf.MaxSuccessors = isucc
+	}
+
+	transport := blockring.NewNetTransportClient(conf.ReapInterval, conf.MaxIdle)
+	c.rs = blockring.NewBlockRing(c, transport, nil)
 
 	return c, nil
 }
@@ -63,62 +77,22 @@ func (client *Client) GetPeer() string {
 	return client.conf.Peers[i]
 }
 
+func (client *Client) LookupHash(hash []byte, n int) (*chord.Vnode, []*chord.Vnode, error) {
+	return client.locate.LookupHash(client.GetPeer(), hash, n)
+}
+func (client *Client) LookupKey(key []byte, n int) ([]byte, *chord.Vnode, []*chord.Vnode, error) {
+	return client.locate.LookupKey(client.GetPeer(), key, n)
+}
+func (client *Client) LocateReplicatedHash(hash []byte, r int) ([]*structs.Location, error) {
+	return client.locate.LocateReplicatedHash(client.GetPeer(), hash, r)
+}
+
 // SetBlock sets the given block on the ring with the configured replication factor
-func (client *Client) SetBlock(block *structs.Block, opts ...RequestOptions) error {
-	id := block.ID()
-
-	_, succs, err := client.locate.LookupHash(client.GetPeer(), id, 1)
-	//locs, err := client.locate.LocateBlock(client.conf.Peers[0], id)
-	if err != nil {
-		return err
-	}
-
-	loc := &structs.Location{Id: id}
-
-	for _, succ := range succs {
-		loc.Vnode = succ
-		er := client.store.SetBlock(loc, block)
-		if er != nil {
-			err = er
-		}
-	}
-
-	return err
+func (client *Client) SetBlock(block *structs.Block, opts ...blockring.RequestOptions) (*structs.Location, error) {
+	return client.rs.SetBlock(block, opts...)
 }
 
 // GetBlock gets a block given the id.  It returns the first available block.
-func (client *Client) GetBlock(id []byte, opts ...RequestOptions) (*structs.Location, *structs.Block, error) {
-
-	_, succs, err := client.locate.LookupHash(client.GetPeer(), id, 3)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	/*locs, err := client.locate.LocateBlock(client.conf.Peers[0], id)
-	if err != nil {
-		return nil, err
-	}*/
-
-	loc := &structs.Location{Id: id}
-	for _, succ := range succs {
-		loc.Vnode = succ
-		block, er := client.store.GetBlock(loc, id)
-		if er == nil {
-			return loc, block, nil
-		}
-		err = er
-	}
-
-	return loc, nil, err
-}
-
-// GetRootBlock gets a root block with the given id
-func (client *Client) GetRootBlock(id []byte, opts ...RequestOptions) (*structs.Location, *structs.RootBlock, error) {
-	loc, block, err := client.GetBlock(id, opts...)
-	if err == nil {
-		var rb structs.RootBlock
-		err = rb.DecodeBlock(block)
-		return loc, &rb, err
-	}
-	return loc, nil, err
+func (client *Client) GetBlock(id []byte, opts ...blockring.RequestOptions) (*structs.Location, *structs.Block, error) {
+	return client.rs.GetBlock(id, opts...)
 }

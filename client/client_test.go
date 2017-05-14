@@ -17,7 +17,7 @@ func TestClient(t *testing.T) {
 	}
 
 	blk := structs.NewDataBlock([]byte("foo"))
-	if err = client.SetBlock(blk); err != nil {
+	if _, err = client.SetBlock(blk); err != nil {
 		t.Fatal(err)
 	}
 
