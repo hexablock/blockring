@@ -33,10 +33,13 @@ func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 		"Type": BlockType_ROOTBLOCK,
 		"Size": idx.sz,
 	}
-	ids := map[uint64]string{}
-	for k, v := range idx.ids {
-		ids[k] = hex.EncodeToString(v)
-	}
+
+	ids := make([]string, len(idx.ids))
+	idx.Iter(func(index uint64, id []byte) error {
+		ids[index] = hex.EncodeToString(id)
+		return nil
+	})
+
 	m["Blocks"] = ids
 	return json.Marshal(m)
 }
@@ -55,6 +58,7 @@ func (idx *RootBlock) AddBlock(index uint64, blk *Block) {
 	idx.mu.Unlock()
 }
 
+// Iter iterates over each block id in order.
 func (idx *RootBlock) Iter(f func(index uint64, id []byte) error) error {
 	// sort by index
 	keys := make([][]byte, len(idx.ids))
