@@ -10,6 +10,8 @@ import (
 	"github.com/hexablock/blockring/utils"
 )
 
+const DefaultBlockSize = 128 * 1024
+
 var (
 	errInvalidBlockData = errors.New("invalid block data")
 )
@@ -17,21 +19,31 @@ var (
 type RootBlock struct {
 	mu  sync.RWMutex
 	sz  uint64
+	bs  uint32 // block size
 	ids map[uint64][]byte
 }
 
 func NewRootBlock() *RootBlock {
-	return &RootBlock{ids: make(map[uint64][]byte)}
+	return &RootBlock{ids: make(map[uint64][]byte), bs: DefaultBlockSize}
 }
 
+func (idx *RootBlock) BlockSize() uint32 {
+	return idx.bs
+}
+func (idx *RootBlock) SetBlockSize(bs uint32) {
+	idx.bs = bs
+}
+
+// Len returns the number of blocks in the root block
 func (idx *RootBlock) Len() int {
 	return len(idx.ids)
 }
 
 func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
-		"Type": BlockType_ROOTBLOCK,
-		"Size": idx.sz,
+		"Type":      BlockType_ROOTBLOCK,
+		"Size":      idx.sz,
+		"BlockSize": idx.bs,
 	}
 
 	ids := make([]string, len(idx.ids))
@@ -86,12 +98,17 @@ func (idx *RootBlock) EncodeBlock() *Block {
 		a[i-1] = idx.ids[i]
 	}
 
+	bids := utils.ConcatByteSlices(a...)
+
 	blk := &Block{Type: BlockType_ROOTBLOCK}
+	// size
 	sb := make([]byte, 8)
 	binary.BigEndian.PutUint64(sb, idx.sz)
-	d := utils.ConcatByteSlices(a...)
-	blk.Data = utils.ConcatByteSlices(sb, d)
+	// block size
+	bs := make([]byte, 4)
+	binary.BigEndian.PutUint32(bs, idx.bs)
 
+	blk.Data = utils.ConcatByteSlices(sb, bs, bids)
 	return blk
 }
 
@@ -100,19 +117,20 @@ func (idx *RootBlock) DecodeBlock(block *Block) error {
 	if block.Type != BlockType_ROOTBLOCK {
 		return ErrInvalidBlockType
 	}
-	if len(block.Data) < 8 {
+	if len(block.Data) < 12 {
 		return errInvalidBlockData
 	}
 
 	idx.sz = binary.BigEndian.Uint64(block.Data[:8])
-	if (len(block.Data[8:]) % 32) != 0 {
+	idx.bs = binary.BigEndian.Uint32(block.Data[8:12])
+	if (len(block.Data[12:]) % 32) != 0 {
 		return errInvalidBlockData
 	}
 
 	idx.ids = make(map[uint64][]byte)
 	c := uint64(1)
 	l := uint64(len(block.Data))
-	for i := uint64(8); i < l; i += 32 {
+	for i := uint64(12); i < l; i += 32 {
 		idx.ids[c] = block.Data[i : i+32]
 		c++
 	}

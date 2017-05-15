@@ -39,7 +39,7 @@ func TestRootBlock(t *testing.T) {
 	}
 
 	blk := ib.EncodeBlock()
-	if len(blk.Data) != 8+(3*32) {
+	if len(blk.Data) != 12+(3*32) {
 		t.Fatal("invalid size", len(blk.Data))
 	}
 
@@ -52,6 +52,13 @@ func TestRootBlock(t *testing.T) {
 		if _, ok := ib.ids[k]; !ok {
 			t.Error(k, "not found")
 		}
+	}
+
+	if root.Size() != ib.Size() {
+		t.Fatal("size mismatch")
+	}
+	if root.BlockSize() != ib.BlockSize() {
+		t.Fatal("block size mismatch")
 	}
 
 }
