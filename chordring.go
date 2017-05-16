@@ -107,12 +107,8 @@ func (cr *ChordRing) NumSuccessors() int {
 	return cr.conf.NumSuccessors
 }
 
+// join ring if peers provided.
 func joinOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (*ChordRing, error) {
-	peers := peerStore.Peers()
-	if len(peers) > 0 {
-		// retry join
-		return retryJoinRing(conf, peerStore, trans)
-	}
 
 	if len(conf.Peers) > 0 {
 
@@ -127,8 +123,15 @@ func joinOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCT
 		}
 	}
 
+	// if we have known peers and we have not left the ring then simply start the ring as other members
+	// will assimilate.  not doing so at times causes a panic.
+	if len(peerStore.Peers()) > 0 {
+		log.Printf("Starting hostname=%s", conf.Chord.Hostname)
+	} else {
+		log.Printf("Starting mode=bootstrap hostname=%s", conf.Chord.Hostname)
+	}
+
 	// create
-	log.Printf("Starting mode=bootstrap hostname=%s", conf.Chord.Hostname)
 	cring, err := chord.Create(conf.Chord, trans)
 	if err == nil {
 		return &ChordRing{ring: cring, conf: conf.Chord, trans: trans, peerStore: peerStore}, nil
@@ -138,9 +141,8 @@ func joinOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCT
 
 // try joining each peer one by one returning the peer and ring on the first successful join
 func joinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (string, *ChordRing, error) {
-
-	peers := append(peerStore.Peers(), conf.Peers...)
-	peers = dedup(peers)
+	knownPeers := peerStore.Peers()
+	peers := dedup(append(conf.Peers, knownPeers...))
 
 	for _, peer := range peers {
 		log.Printf("Trying peer=%s", peer)
@@ -184,26 +186,6 @@ func retryJoinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTra
 	}
 
 }
-
-// JoinRingOrBootstrap joins or bootstraps based on config.
-/*func joinRingOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (*ChordRing, error) {
-	//if len(conf.Peers) > 0 {
-	_, ring, err := joinRing(conf, peerStore, trans)
-	if err == nil {
-		return ring, nil
-	}
-
-	//}
-
-	// TODO: remove failed peers from peer store
-
-	log.Printf("Starting mode=bootstrap hostname=%s", conf.Chord.Hostname)
-	cring, err := chord.Create(conf.Chord, trans)
-	if err == nil {
-		return &ChordRing{ring: cring, conf: conf.Chord, trans: trans, peerStore: peerStore}, nil
-	}
-	return nil, err
-}*/
 
 func dedup(list []string) []string {
 	m := map[string]int{}
