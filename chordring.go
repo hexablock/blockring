@@ -115,9 +115,16 @@ func joinOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCT
 	}
 
 	if len(conf.Peers) > 0 {
+
+		if conf.RetryJoin {
+			return retryJoinRing(conf, peerStore, trans)
+		}
+
 		// join
 		_, ring, err := joinRing(conf, peerStore, trans)
-		return ring, err
+		if err == nil {
+			return ring, nil
+		}
 	}
 
 	// create
