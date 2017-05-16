@@ -24,7 +24,6 @@ type OutConnPool struct {
 	maxIdle          int           // in seconds
 }
 
-// reapConn and maxIdle in seconds
 func NewOutConnPool(reapInterval, maxIdle int) *OutConnPool {
 	pool := &OutConnPool{
 		out:              make(map[string]*OutConn),

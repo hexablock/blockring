@@ -13,6 +13,7 @@ import (
 type PeerStore interface {
 	Peers() []string
 	AddPeer(string) bool
+	RemovePeer(string)
 	SetPeers([]*structs.Peer)
 }
 
@@ -35,6 +36,31 @@ func (ps *PeerInMemStore) Peers() []string {
 	ps.mu.RUnlock()
 
 	return out
+}
+
+// RemovePeer removes a peer from the store.
+func (ps *PeerInMemStore) RemovePeer(peer string) {
+	ps.mu.RLock()
+	if len(ps.peers) > 1 {
+		for i, p := range ps.peers {
+			if p.Address == peer {
+				ps.mu.RUnlock()
+				ps.mu.Lock()
+				ps.peers = append(ps.peers[:i], ps.peers[:i+1]...)
+				ps.mu.Unlock()
+				return
+			}
+		}
+	} else if len(ps.peers) == 1 {
+		if ps.peers[0].Address == peer {
+			ps.mu.RUnlock()
+			ps.mu.Lock()
+			ps.peers = []*structs.Peer{}
+			ps.mu.Unlock()
+			return
+		}
+	}
+	ps.mu.RUnlock()
 }
 
 // AddPeer adds the given peer to the store.  If it exists then the last seen time is updated and false

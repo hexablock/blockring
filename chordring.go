@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+var errNoPeersFound = errors.New("no peers found")
+
 // ChordRing contains
 type ChordRing struct {
 	conf      *chord.Config
@@ -33,7 +35,7 @@ func NewChordRing(conf *Config, peerStore store.PeerStore, gserver *grpc.Server)
 	if conf.RetryJoin {
 		ring, err = retryJoinRing(conf, peerStore, trans)
 	} else {
-		ring, err = joinRingOrBootstrap(conf, peerStore, trans)
+		ring, err = joinOrBootstrap(conf, peerStore, trans)
 	}
 
 	if err == nil {
@@ -105,6 +107,28 @@ func (cr *ChordRing) NumSuccessors() int {
 	return cr.conf.NumSuccessors
 }
 
+func joinOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (*ChordRing, error) {
+	peers := peerStore.Peers()
+	if len(peers) > 0 {
+		// retry join
+		return retryJoinRing(conf, peerStore, trans)
+	}
+
+	if len(conf.Peers) > 0 {
+		// join
+		_, ring, err := joinRing(conf, peerStore, trans)
+		return ring, err
+	}
+
+	// create
+	log.Printf("Starting mode=bootstrap hostname=%s", conf.Chord.Hostname)
+	cring, err := chord.Create(conf.Chord, trans)
+	if err == nil {
+		return &ChordRing{ring: cring, conf: conf.Chord, trans: trans, peerStore: peerStore}, nil
+	}
+	return nil, err
+}
+
 // try joining each peer one by one returning the peer and ring on the first successful join
 func joinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (string, *ChordRing, error) {
 
@@ -119,7 +143,10 @@ func joinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTranspor
 			cr.peerStore.AddPeer(peer)
 			return peer, cr, nil
 		}
+
 		log.Printf("Failed to connect peer=%s msg='%v'", peer, err)
+		peerStore.RemovePeer(peer)
+
 		<-time.After(1250 * time.Millisecond)
 	}
 
@@ -152,22 +179,24 @@ func retryJoinRing(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTra
 }
 
 // JoinRingOrBootstrap joins or bootstraps based on config.
-func joinRingOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (*ChordRing, error) {
-	if len(conf.Peers) > 0 {
-		_, ring, err := joinRing(conf, peerStore, trans)
-		if err == nil {
-			return ring, nil
-		}
-		log.Printf("Failed to join msg='%v'", err)
+/*func joinRingOrBootstrap(conf *Config, peerStore store.PeerStore, trans *chord.GRPCTransport) (*ChordRing, error) {
+	//if len(conf.Peers) > 0 {
+	_, ring, err := joinRing(conf, peerStore, trans)
+	if err == nil {
+		return ring, nil
 	}
 
+	//}
+
+	// TODO: remove failed peers from peer store
+
 	log.Printf("Starting mode=bootstrap hostname=%s", conf.Chord.Hostname)
-	ring, err := chord.Create(conf.Chord, trans)
+	cring, err := chord.Create(conf.Chord, trans)
 	if err == nil {
-		return &ChordRing{ring: ring, conf: conf.Chord, trans: trans, peerStore: peerStore}, nil
+		return &ChordRing{ring: cring, conf: conf.Chord, trans: trans, peerStore: peerStore}, nil
 	}
 	return nil, err
-}
+}*/
 
 func dedup(list []string) []string {
 	m := map[string]int{}

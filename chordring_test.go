@@ -32,7 +32,7 @@ func initChordRing(addr string, peers ...string) (*ChordRing, error) {
 
 	ps := store.NewPeerInMemStore()
 
-	return joinRingOrBootstrap(conf, ps, trans)
+	return joinOrBootstrap(conf, ps, trans)
 }
 
 func TestChordRingBootstrap(t *testing.T) {
