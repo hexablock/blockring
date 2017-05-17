@@ -49,6 +49,20 @@ func (mem *MemBlockStore) IterBlocks(f func(block *structs.Block) error) error {
 	return nil
 }
 
+func (mem *MemBlockStore) IterBlockIDs(f func([]byte) error) error {
+	mem.mu.RLock()
+	for istr := range mem.m {
+
+		if err := f([]byte(istr)); err != nil {
+			mem.mu.RUnlock()
+			return err
+		}
+	}
+	mem.mu.RUnlock()
+
+	return nil
+}
+
 // SetBlock writes the given block to the store returning an error on failure
 func (mem *MemBlockStore) SetBlock(blk *structs.Block) error {
 	mem.mu.Lock()

@@ -14,13 +14,13 @@ type Store interface {
 	GetBlock(id []byte) (*structs.Block, error)
 	SetBlock(block *structs.Block) error
 	IterBlocks(f func(block *structs.Block) error) error
+	IterBlockIDs(f func([]byte) error) error
 }
 
 type Transport interface {
 	GetBlock(loc *structs.Location, id []byte) (*structs.Block, error)
 	SetBlock(loc *structs.Location, block *structs.Block) error
 	TransferBlock(loc *structs.Location, id []byte) error
-	//RegisterStore(Store)
 }
 
 // StoreTransport allows to make requests based on Location around the ring.

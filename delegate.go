@@ -98,9 +98,7 @@ func (s *ChordDelegate) startConsuming() {
 }
 
 func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
-	return s.Store.local.IterBlocks(func(block *structs.Block) error {
-		id := block.ID()
-
+	return s.Store.local.IterBlockIDs(func(id []byte) error {
 		//
 		// Handle transferring natural keys.
 		//

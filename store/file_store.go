@@ -28,6 +28,31 @@ func (st *FileBlockStore) GetBlock(id []byte) (*structs.Block, error) {
 	return st.readBlockFromFile(ap)
 }
 
+func (st *FileBlockStore) IterBlockIDs(f func(id []byte) error) error {
+	files, err := ioutil.ReadDir(st.datadir)
+	if err != nil {
+		return err
+	}
+
+	for _, fl := range files {
+		if fl.IsDir() {
+			continue
+		}
+
+		id, er := hex.DecodeString(fl.Name())
+		if er != nil {
+			continue
+		}
+
+		if er := f(id); er != nil {
+			err = er
+			break
+		}
+	}
+
+	return err
+}
+
 // IterBlocks iterates over blocks in theh store.  If an error is returned by the callback
 // iteration is immediately terminated returning the error.
 func (st *FileBlockStore) IterBlocks(f func(block *structs.Block) error) error {
