@@ -15,7 +15,9 @@ import (
 type ChordDelegate struct {
 	Store *StoreTransport
 
-	ring *ChordRing
+	ring      *ChordRing
+	blockRing *BlockRing
+
 	// Incoming candidate blocks to be locally stored i.e. taken over. These are either stored or
 	// forwarded based on location ID
 	InBlocks chan *rpc.BlockRPCData
@@ -30,17 +32,46 @@ func NewChordDelegate(peerStore store.PeerStore, inBlockBufSize int) *ChordDeleg
 	}
 }
 
-// RegisterRing registers the chord ring to the delegate and starts processing incoming blocks
-func (s *ChordDelegate) RegisterRing(ring *ChordRing) {
+// Register registers the chord ring to the delegate and starts processing incoming blocks
+func (s *ChordDelegate) Register(ring *ChordRing, blockRing *BlockRing) {
+	//s.ring = ring
+	s.blockRing = blockRing
 	s.ring = ring
+
 	go s.startConsuming()
+}
+
+func (s *ChordDelegate) acquireBlock(id []byte, loc *structs.Location) {
+	// skip if we have the block
+	if _, err := s.Store.local.GetBlock(id); err == nil {
+		return
+	}
+
+	// get the block from the ring.
+	_, blk, err := s.blockRing.GetBlock(id)
+	if err != nil {
+		log.Printf("ERR action=takeover phase=failed block/%x  msg='Failed to get block: %v'", id, err)
+	}
+
+	log.Printf("DBG action=takeover phase=begin block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
+
+	// try to set block
+	if err = s.Store.SetBlock(loc, blk); err != nil {
+		log.Printf("ERR action=takeover phase=failed block/%x dst=%s msg='%v'",
+			id, utils.ShortVnodeID(loc.Vnode), err)
+	} else {
+
+		log.Printf("DBG action=takeover phase=complete block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
+		// TODO:
+		// - ReleaseBlock(id)
+	}
 }
 
 // StartConsuming takes incoming blocks and adds them to the local store if they fall within the perview
 // of the host or are transferred to the predecessor.
 func (s *ChordDelegate) startConsuming() {
 	for b := range s.InBlocks {
-		id := b.Block.ID()
+		id := b.ID
 
 		_, vn, err := s.ring.LookupHash(id, 1)
 		if err != nil {
@@ -48,23 +79,15 @@ func (s *ChordDelegate) startConsuming() {
 			continue
 		}
 
+		// takeover block since we own it.
 		if vn[0].Host == s.ring.Hostname() {
-			// takeover block since we own it.
-			log.Printf("DBG action=takeover phase=begin block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
-
-			if err = s.Store.SetBlock(b.Location, b.Block); err != nil {
-				log.Printf("ERR action=takeover phase=failed block/%x src=%s dst=%s msg='%v'",
-					id, s.ring.Hostname(), utils.ShortVnodeID(vn[0]), err)
-			} else {
-				log.Printf("DBG action=takeover phase=complete block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
-			}
-
+			s.acquireBlock(id, b.Location)
 		} else {
 			// re-route
 			log.Printf("DBG action=route phase=begin block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
 
 			loc := &structs.Location{Id: id, Vnode: vn[0]}
-			if err = s.Store.remote.TransferBlock(loc, b.Block); err != nil {
+			if err = s.Store.remote.TransferBlock(loc, id); err != nil {
 				log.Printf("ERR action=route phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(vn[0]), err)
 			} else {
 				log.Printf("DBG action=route phase=complete block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
@@ -90,7 +113,7 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 
 		loc := &structs.Location{Id: id, Vnode: remote}
 		log.Printf("DBG action=transfer phase=begin block/%x dst=%s", id, utils.ShortVnodeID(remote))
-		if err := s.Store.remote.TransferBlock(loc, block); err != nil {
+		if err := s.Store.remote.TransferBlock(loc, id); err != nil {
 			log.Printf("ERR action=transfer phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(remote), err)
 		} else {
 			log.Printf("DBG action=transfer phase=complete block/%x dst=%s", id, utils.ShortVnodeID(remote))

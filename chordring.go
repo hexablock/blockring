@@ -38,13 +38,13 @@ func NewChordRing(conf *Config, peerStore store.PeerStore, gserver *grpc.Server)
 		ring, err = joinOrBootstrap(conf, peerStore, trans)
 	}
 
-	if err == nil {
-		if dlg, ok := conf.Chord.Delegate.(*ChordDelegate); ok {
-			dlg.RegisterRing(ring)
-		} else {
-			err = errors.New("unsupported chord delegate")
-		}
-	}
+	// if err == nil {
+	// 	if dlg, ok := conf.Chord.Delegate.(*ChordDelegate); ok {
+	// 		dlg.RegisterRing(ring)
+	// 	} else {
+	// 		err = errors.New("unsupported chord delegate")
+	// 	}
+	// }
 
 	return ring, err
 }

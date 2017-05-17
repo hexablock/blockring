@@ -19,7 +19,7 @@ type Store interface {
 type Transport interface {
 	GetBlock(loc *structs.Location, id []byte) (*structs.Block, error)
 	SetBlock(loc *structs.Location, block *structs.Block) error
-	TransferBlock(loc *structs.Location, block *structs.Block) error
+	TransferBlock(loc *structs.Location, id []byte) error
 	//RegisterStore(Store)
 }
 
@@ -55,9 +55,9 @@ func (t *StoreTransport) SetBlock(loc *structs.Location, block *structs.Block) e
 	return t.remote.SetBlock(loc, block)
 }
 
-func (t *StoreTransport) TransferBlock(loc *structs.Location, block *structs.Block) error {
+func (t *StoreTransport) TransferBlock(loc *structs.Location, id []byte) error {
 	if loc.Vnode.Host == t.host {
 		return errNoLocalTransfer
 	}
-	return t.remote.TransferBlock(loc, block)
+	return t.remote.TransferBlock(loc, id)
 }

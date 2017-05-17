@@ -36,22 +36,27 @@ func (s *NetTransportClient) SetBlock(loc *structs.Location, block *structs.Bloc
 	if err != nil {
 		return err
 	}
-	defer s.out.Return(conn)
 
 	req := &rpc.BlockRPCData{Block: block}
 	_, err = conn.BlockRPC.SetBlockRPC(context.Background(), req)
+
+	s.out.Return(conn)
+
 	return err
 }
 
-func (s *NetTransportClient) TransferBlock(loc *structs.Location, block *structs.Block) error {
+func (s *NetTransportClient) TransferBlock(loc *structs.Location, id []byte) error {
 	conn, err := s.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return err
 	}
-	defer s.out.Return(conn)
 
-	req := &rpc.BlockRPCData{Block: block, Location: loc}
+	// TODO: use only block ids
+	req := &rpc.BlockRPCData{Location: loc, ID: id}
 	_, err = conn.BlockRPC.TransferBlockRPC(context.Background(), req)
+
+	s.out.Return(conn)
+
 	return err
 }
 
