@@ -8,95 +8,99 @@ import (
 	"google.golang.org/grpc"
 )
 
+// OutConn is an outbound connection
 type OutConn struct {
 	host      string
 	conn      *grpc.ClientConn
 	BlockRPC  rpc.BlockRPCClient
 	LocateRPC rpc.LocateRPCClient
-	lastUsed  int64
+	lastUsed  time.Time
 }
 
+// OutConnPool is an outbound connection pool
 type OutConnPool struct {
-	mu  sync.RWMutex
-	out map[string]*OutConn
+	mu   sync.RWMutex
+	pool map[string][]*OutConn
 
 	connReapInterval time.Duration // in seconds
-	maxIdle          int           // in seconds
+	maxIdle          time.Duration // in seconds
 }
 
 func NewOutConnPool(reapInterval, maxIdle int) *OutConnPool {
 	pool := &OutConnPool{
-		out:              make(map[string]*OutConn),
+		pool:             make(map[string][]*OutConn),
 		connReapInterval: time.Second * time.Duration(reapInterval),
-		maxIdle:          maxIdle,
+		maxIdle:          time.Duration(maxIdle) * time.Second,
 	}
-	go pool.reapConns()
+	go pool.reapOld()
 	return pool
 }
 
-func (pool *OutConnPool) Return(conn *OutConn) {
-	pool.mu.RLock()
-	if _, ok := pool.out[conn.host]; ok {
-		pool.mu.RUnlock()
-		pool.mu.Lock()
-		pool.out[conn.host].lastUsed = time.Now().Unix()
-		pool.mu.Unlock()
-	} else {
-		pool.mu.Unlock()
-	}
-}
-
+// Get returns an existing or new connection
 func (pool *OutConnPool) Get(host string) (*OutConn, error) {
-	pool.mu.RLock()
-	if v, ok := pool.out[host]; ok {
-		defer pool.mu.RUnlock()
-		return v, nil
-	}
-	pool.mu.RUnlock()
-
-	conn, err := grpc.Dial(host, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-
-	oc := &OutConn{
-		host:      host,
-		conn:      conn,
-		BlockRPC:  rpc.NewBlockRPCClient(conn),
-		LocateRPC: rpc.NewLocateRPCClient(conn),
-		lastUsed:  time.Now().Unix(),
-	}
+	// Check if we have a conn cached
+	var out *OutConn
 
 	pool.mu.Lock()
-	pool.out[host] = oc
+	list, ok := pool.pool[host]
+	if ok && len(list) > 0 {
+		out = list[len(list)-1]
+		list = list[:len(list)-1]
+		pool.pool[host] = list
+	}
 	pool.mu.Unlock()
 
-	return oc, nil
-
+	// Make a new connection
+	if out == nil {
+		conn, err := grpc.Dial(host, grpc.WithInsecure())
+		if err == nil {
+			return &OutConn{
+				host:      host,
+				BlockRPC:  rpc.NewBlockRPCClient(conn),
+				LocateRPC: rpc.NewLocateRPCClient(conn),
+				conn:      conn,
+				lastUsed:  time.Now(),
+			}, nil
+		}
+		return nil, err
+	}
+	// return an existing connection
+	return out, nil
 }
 
-// reapConns reaps idle connections every 30 seconds
-func (pool *OutConnPool) reapConns() {
+// Return returns a connection back to the pool
+func (pool *OutConnPool) Return(o *OutConn) {
+	o.lastUsed = time.Now()
+	pool.mu.Lock()
+
+	list, _ := pool.pool[o.host]
+	pool.pool[o.host] = append(list, o)
+	pool.mu.Unlock()
+}
+
+func (pool *OutConnPool) reapOld() {
 	for {
-		//time.Sleep(30 * time.Second)
 		time.Sleep(pool.connReapInterval)
 		pool.reapOnce()
 	}
 }
 
-// reapOnce does a one time reap across all connections, closing and removing any that have been idle
-// for more than 2 mins.
 func (pool *OutConnPool) reapOnce() {
-
-	now := time.Now().Unix()
-
 	pool.mu.Lock()
-	for k, v := range pool.out {
-		// expire all older than maxIdleInSecs
-		if (now - v.lastUsed) > int64(pool.maxIdle) {
-			v.conn.Close()
-			delete(pool.out, k)
+
+	for host, conns := range pool.pool {
+		max := len(conns)
+		for i := 0; i < max; i++ {
+			if time.Since(conns[i].lastUsed) > pool.maxIdle {
+				conns[i].conn.Close()
+				conns[i], conns[max-1] = conns[max-1], nil
+				max--
+				i--
+			}
 		}
+
+		pool.pool[host] = conns[:max]
 	}
+
 	pool.mu.Unlock()
 }

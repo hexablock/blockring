@@ -24,6 +24,8 @@ func (ls *LookupServiceClient) LookupHash(host string, hash []byte, n int) (*cho
 		return nil, nil, err
 	}
 
+	defer ls.out.Return(conn)
+
 	lreq := &rpc.LocateRequest{Key: hash, N: int32(n)}
 	resp, err := conn.LocateRPC.LookupHashRPC(context.Background(), lreq)
 	if err != nil {
@@ -39,6 +41,8 @@ func (ls *LookupServiceClient) LookupKey(host string, key []byte, n int) ([]byte
 		return nil, nil, nil, err
 	}
 
+	defer ls.out.Return(conn)
+
 	lreq := &rpc.LocateRequest{Key: key, N: int32(n)}
 	resp, err := conn.LocateRPC.LookupKeyRPC(context.Background(), lreq)
 	if err != nil {
@@ -53,6 +57,8 @@ func (ls *LookupServiceClient) LocateReplicatedKey(host string, key []byte, r in
 		return nil, err
 	}
 
+	defer ls.out.Return(conn)
+
 	lreq := &rpc.LocateRequest{Key: key, N: int32(r)}
 	resp, err := conn.LocateRPC.LocateReplicatedKeyRPC(context.Background(), lreq)
 	if err != nil {
@@ -65,6 +71,8 @@ func (ls *LookupServiceClient) LocateReplicatedHash(host string, hash []byte, r 
 	if err != nil {
 		return nil, err
 	}
+
+	defer ls.out.Return(conn)
 
 	lreq := &rpc.LocateRequest{Key: hash, N: int32(r)}
 	resp, err := conn.LocateRPC.LocateReplicatedHashRPC(context.Background(), lreq)
@@ -79,9 +87,11 @@ func (ls *LookupServiceClient) Negotiate(host string) (*rpc.NegotiateResponse, e
 	if err != nil {
 		return nil, err
 	}
+
+	defer ls.out.Return(conn)
+
 	req := &rpc.NegotiateRequest{}
 	return conn.LocateRPC.NegotiateRPC(context.Background(), req)
-	//return resp, err
 }
 
 type LookupService struct {
