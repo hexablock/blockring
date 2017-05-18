@@ -19,3 +19,11 @@ message Location {
     int32 Priority = 2;
     chord.Vnode Vnode = 3;
 }
+
+message Reference {
+    bytes Previous = 1;
+    bytes Data = 2;
+    uint32 Mode = 3;
+    string Name = 4;
+    bytes Inline = 5;
+}

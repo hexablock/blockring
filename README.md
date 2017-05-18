@@ -11,22 +11,16 @@ There are 2 main data categories.  This determines how data is written to the ri
 
 ### Mutable
 
-## TODO
-
-- [x] Peer store
-- [x] Client library
-- [ ] Data
-    - [x] Routing
-        - [ ] Optimizations
-    - [x] Datastore
-- [ ] Graceful shutdown
-
 ### Roadmap
 
+- [ ] Node failure
+- [ ] Node leave
 - [ ] Replication
+- [ ] Compaction
 - [ ] Mutable data
     - [ ] Log
     - [ ] Consensus
+- [ ] Optimizations
 
 ## References
 - http://nms.lcs.mit.edu/papers/chord.pdf
