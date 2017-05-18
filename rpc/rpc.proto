@@ -9,6 +9,7 @@ service BlockRPC {
     rpc GetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc SetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc TransferBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc ReleaseBlockRPC(BlockRPCData) returns (BlockRPCData) {}
 }
 
 service LocateRPC {

@@ -22,6 +22,19 @@ func NewMemBlockStore() *MemBlockStore {
 	return &MemBlockStore{m: make(map[string]*structs.Block)}
 }
 
+// ReleaseBlock marks a block to be released from the store.
+func (mem *MemBlockStore) ReleaseBlock(id []byte) error {
+
+	mem.mu.RLock()
+	if _, ok := mem.m[string(id)]; ok {
+		mem.mu.RUnlock()
+		return errors.New("TBI")
+	}
+	mem.mu.RUnlock()
+
+	return errNotFound
+}
+
 // GetBlock returns a block with the given id if it exists
 func (mem *MemBlockStore) GetBlock(id []byte) (*structs.Block, error) {
 

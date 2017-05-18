@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/hex"
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -89,6 +90,20 @@ func (st *FileBlockStore) IterBlocks(f func(block *structs.Block) error) error {
 // SetBlock writes the given block to the store returning an error on failure
 func (st *FileBlockStore) SetBlock(blk *structs.Block) error {
 	return st.writeBlockToFile(blk)
+}
+
+// ReleaseBlock marks a block to be released (eventually removed) from the store.
+func (st *FileBlockStore) ReleaseBlock(id []byte) error {
+	sid := hex.EncodeToString(id)
+	ap := st.abspath(sid)
+
+	if _, err := os.Stat(ap); err != nil {
+		return errNotFound
+	}
+
+	//log.Printf("Releasing block/%x path='%s'", id, ap)
+
+	return errors.New("TBI")
 }
 
 func (st *FileBlockStore) writeBlockToFile(blk *structs.Block) error {

@@ -60,6 +60,20 @@ func (s *NetTransportClient) TransferBlock(loc *structs.Location, id []byte) err
 	return err
 }
 
+func (s *NetTransportClient) ReleaseBlock(loc *structs.Location, id []byte) error {
+	conn, err := s.out.Get(loc.Vnode.Host)
+	if err != nil {
+		return err
+	}
+
+	req := &rpc.BlockRPCData{ID: id}
+	_, err = conn.BlockRPC.ReleaseBlockRPC(context.Background(), req)
+
+	s.out.Return(conn)
+
+	return err
+}
+
 type NetTransport struct {
 	st Store
 	// potential inbound blocks
@@ -97,4 +111,9 @@ func (s *NetTransport) TransferBlockRPC(ctx context.Context, in *rpc.BlockRPCDat
 
 	s.inBlocks <- in
 	return &rpc.BlockRPCData{}, nil
+}
+
+func (s *NetTransport) ReleaseBlockRPC(ctx context.Context, in *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
+	err := s.st.ReleaseBlock(in.ID)
+	return &rpc.BlockRPCData{}, err
 }

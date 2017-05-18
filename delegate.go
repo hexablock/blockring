@@ -41,7 +41,7 @@ func (s *ChordDelegate) Register(ring *ChordRing, blockRing *BlockRing) {
 	go s.startConsuming()
 }
 
-func (s *ChordDelegate) acquireBlock(id []byte, loc *structs.Location) {
+func (s *ChordDelegate) takeoverBlock(id []byte, loc *structs.Location) {
 	// skip if we have the block
 	if _, err := s.Store.local.GetBlock(id); err == nil {
 		return
@@ -60,10 +60,7 @@ func (s *ChordDelegate) acquireBlock(id []byte, loc *structs.Location) {
 		log.Printf("ERR action=takeover phase=failed block/%x dst=%s msg='%v'",
 			id, utils.ShortVnodeID(loc.Vnode), err)
 	} else {
-
 		log.Printf("DBG action=takeover phase=complete block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
-		// TODO:
-		// - ReleaseBlock(id)
 	}
 }
 
@@ -81,7 +78,7 @@ func (s *ChordDelegate) startConsuming() {
 
 		// takeover block since we own it.
 		if vn[0].Host == s.ring.Hostname() {
-			s.acquireBlock(id, b.Location)
+			s.takeoverBlock(id, b.Location)
 		} else {
 			// re-route
 			log.Printf("DBG action=route phase=begin block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
@@ -105,7 +102,6 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 
 		// skip blocks that do not belong to the new remote
 		if bytes.Compare(id, remote.Id) >= 0 {
-			//log.Printf("DBG action=transfer phase=skipping block/%x dst=%s", id, utils.ShortVnodeID(remote))
 			return nil
 		}
 

@@ -13,7 +13,11 @@ var (
 type Store interface {
 	GetBlock(id []byte) (*structs.Block, error)
 	SetBlock(block *structs.Block) error
+	// Marks a block to be released from the store.
+	ReleaseBlock(id []byte) error
+	// Iterate over all blocks
 	IterBlocks(f func(block *structs.Block) error) error
+	// Iteraters over all blocks in the store
 	IterBlockIDs(f func([]byte) error) error
 }
 
@@ -21,6 +25,7 @@ type Transport interface {
 	GetBlock(loc *structs.Location, id []byte) (*structs.Block, error)
 	SetBlock(loc *structs.Location, block *structs.Block) error
 	TransferBlock(loc *structs.Location, id []byte) error
+	ReleaseBlock(loc *structs.Location, id []byte) error
 }
 
 // StoreTransport allows to make requests based on Location around the ring.
@@ -60,4 +65,11 @@ func (t *StoreTransport) TransferBlock(loc *structs.Location, id []byte) error {
 		return errNoLocalTransfer
 	}
 	return t.remote.TransferBlock(loc, id)
+}
+
+func (t *StoreTransport) ReleaseBlock(loc *structs.Location, id []byte) error {
+	if loc.Vnode.Host == t.host {
+		return t.local.ReleaseBlock(id)
+	}
+	return t.remote.ReleaseBlock(loc, id)
 }
