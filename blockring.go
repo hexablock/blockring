@@ -16,9 +16,81 @@ type Locator interface {
 	LocateReplicatedHash([]byte, int) ([]*structs.Location, error)
 }
 
+type locatorRouter struct {
+	Locator
+}
+
+// RouteHash routes a hash around the ring visiting each vnode. It starts by looking up first n vnodes for the id.  If
+// the first batch of n vnodes does not contain the block, then the next n vnodes from the last vnode of the
+// previous batch is used until a full circle has been made around the ring.
+func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location) bool) error {
+	lid := hash
+
+	_, vns, err := rl.LookupHash(lid, n)
+	if err != nil {
+		return err
+	}
+
+	// Try the primary vnode
+	svn := vns[0]
+	pstart := int32(0)
+
+	loc := &structs.Location{Id: hash, Vnode: svn, Priority: pstart}
+	if !f(loc) {
+		return nil
+	}
+
+	// Try successors in n batches
+	m := map[string]bool{}
+	wset := vns[1:]
+	done := false
+	pstart++
+
+	for {
+		// exclude vnodes we have visited.
+		out := make([]*chord.Vnode, 0, n)
+		for _, vn := range wset {
+			// If we are back at the starting vnode we've completed a full round.
+			// Set to exit after this iteration
+			if utils.EqualBytes(svn.Id, vn.Id) {
+				done = true
+				break
+			}
+
+			// if we have not visited - track and add to list of vnodes
+			if _, ok := m[vn.StringID()]; !ok {
+				m[vn.StringID()] = true
+				out = append(out, vn)
+			}
+
+		}
+
+		for _, vn := range out {
+			loc := &structs.Location{Id: hash, Vnode: vn, Priority: pstart}
+			if !f(loc) {
+				return nil
+			}
+			pstart++
+		}
+
+		if done {
+			return nil
+		}
+
+		lid = out[len(out)-1].Id
+
+		// update the next set of vnodes to query
+		_, vn, err := rl.LookupHash(lid, n)
+		if err != nil {
+			return err
+		}
+		wset = vn
+	}
+}
+
 // BlockRing is the core interface to perform operations around the ring.
 type BlockRing struct {
-	locator   Locator
+	locator   *locatorRouter
 	transport Transport
 
 	ch               chan<- *rpc.BlockRPCData // send only channel for block transfer requests
@@ -29,7 +101,7 @@ type BlockRing struct {
 // automatically enabled.
 func NewBlockRing(locator Locator, transport Transport, ch chan<- *rpc.BlockRPCData) *BlockRing {
 	rs := &BlockRing{
-		locator:   locator,
+		locator:   &locatorRouter{Locator: locator},
 		transport: transport,
 	}
 	if ch != nil {
@@ -89,23 +161,23 @@ func (br *BlockRing) GetBlock(id []byte, opts ...RequestOptions) (*structs.Locat
 		o = opts[0]
 	}
 
-	return br.route(id, o.PeerRange)
+	var (
+		blk *structs.Block
+		loc *structs.Location
+	)
 
-}
+	err := br.locator.RouteHash(id, o.PeerRange, func(l *structs.Location) bool {
+		if b, err := br.transport.GetBlock(l, id); err == nil {
+			blk = b
+			loc = l
+			return false
+		}
+		return true
+	})
 
-// getBlock gets the first available block from the given vnodes. Any found block is submitted to shift proximity
-// if enabled.
-func (br *BlockRing) getBlock(id []byte, vns []*chord.Vnode, pstart int32) (*structs.Location, *structs.Block, error) {
-	var err error
-
-	for i, vn := range vns {
-
-		loc := &structs.Location{Id: id, Vnode: vn, Priority: int32(i) + pstart}
-		blk, er := br.transport.GetBlock(loc, id)
-		if er != nil {
-			//log.Printf("ERR action=GetBlock block=%x distance=%d msg='%v'", id, i, er)
-			err = utils.MergeErrors(err, er)
-			continue
+	if err == nil {
+		if blk == nil {
+			err = errors.New("not found")
 		}
 
 		/*if br.proxShiftEnabled {
@@ -118,71 +190,7 @@ func (br *BlockRing) getBlock(id []byte, vns []*chord.Vnode, pstart int32) (*str
 				},
 			}
 		}*/
-
-		return loc, blk, nil
-	}
-	return nil, nil, err
-}
-
-// route routes a getblock request around the ring. It starts by looking up first n vnodes for the id.  If
-// the first batch of n vnodes does not contain the block, then the next n vnodes from the last vnode of the
-// previous batch is used until a full circle has been made around the ring.
-func (br *BlockRing) route(id []byte, n int) (*structs.Location, *structs.Block, error) {
-	lid := id
-
-	_, vns, err := br.locator.LookupHash(lid, n)
-	if err != nil {
-		return nil, nil, err
 	}
 
-	// Try the primary vnode
-	svn := vns[0]
-	loc := &structs.Location{Id: id, Vnode: svn, Priority: 0}
-	blk, err := br.transport.GetBlock(loc, id)
-	if err == nil {
-		return loc, blk, nil
-	}
-
-	// Try successors in n batches
-	m := map[string]bool{}
-	wset := vns[1:]
-	bail := false
-	pstart := 1
-
-	for {
-		// exclude vnodes we have visited.
-		out := make([]*chord.Vnode, 0, n)
-		for _, vn := range wset {
-			// if we have not visited - track and add to list of vnodes
-			if _, ok := m[vn.StringID()]; !ok {
-				m[vn.StringID()] = true
-				out = append(out, vn)
-			}
-			// If we are back at the starting vnode we've completed a full round.
-			// Set to exit after this iteration
-			if utils.EqualBytes(svn.Id, vn.Id) {
-				bail = true
-				break
-			}
-
-		}
-
-		loc, blk, err := br.getBlock(id, out, int32(pstart))
-		if err == nil {
-			return loc, blk, nil
-		}
-
-		if bail {
-			return nil, nil, errors.New("not found")
-		}
-
-		lid = out[len(out)-1].Id
-		pstart += len(out)
-		// update the next set of vnodes to query
-		_, vn, err := br.locator.LookupHash(lid, n)
-		if err != nil {
-			return nil, nil, err
-		}
-		wset = vn
-	}
+	return loc, blk, err
 }
