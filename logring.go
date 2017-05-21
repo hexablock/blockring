@@ -12,10 +12,10 @@ import (
 )
 
 type LogTransport interface {
-	ProposeTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error)
-	NewTx(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error)
-	GetTx(loc *structs.Location, hash []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error)
-	CommitTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error)
+	ProposeEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error)
+	NewEntry(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error)
+	GetEntry(loc *structs.Location, hash []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error)
+	CommitEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error)
 }
 
 // LogRing is the core interface to perform operations around the ring.
@@ -44,17 +44,17 @@ func NewLogRing(locator Locator, trans LogTransport, ch chan<- *rpc.BlockRPCData
 	return rs
 }
 
-func (lr *LogRing) NewTx(key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
+func (lr *LogRing) NewEntry(key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
 	keyHash, _, succs, err := lr.locator.LookupKey(key, 1)
 	if err != nil {
 		return nil, nil, err
 	}
 	loc := &structs.Location{Id: keyHash, Vnode: succs[0]}
-	return lr.transport.NewTx(loc, key, opts)
+	return lr.transport.NewEntry(loc, key, opts)
 }
 
 // ProposeTx proposes a transaction to the network.
-func (lr *LogRing) ProposeTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
+func (lr *LogRing) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
 
 	locs, err := lr.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
@@ -84,7 +84,7 @@ func (lr *LogRing) ProposeTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Met
 							Source:      opts.Source,
 							PeerSetSize: opts.PeerSetSize,
 						}
-						if _, er := lr.transport.ProposeTx(loc, tx, o); er != nil {
+						if _, er := lr.transport.ProposeEntry(loc, tx, o); er != nil {
 							errCh <- er
 						}
 
@@ -108,7 +108,7 @@ func (lr *LogRing) ProposeTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Met
 						Source:      loc.Vnode.Id,
 						PeerSetSize: opts.PeerSetSize,
 					}
-					if _, er := lr.transport.ProposeTx(loc, tx, o); er != nil {
+					if _, er := lr.transport.ProposeEntry(loc, tx, o); er != nil {
 						errCh <- er
 					}
 				}
@@ -135,11 +135,13 @@ func (lr *LogRing) ProposeTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Met
 	return meta, err
 }
 
-func (lr *LogRing) CommitTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
+func (lr *LogRing) CommitEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
 	locs, err := lr.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: call concurrently
 
 	var meta *hexalog.Meta
 	if opts.Source != nil && len(opts.Source) > 0 {
@@ -151,7 +153,7 @@ func (lr *LogRing) CommitTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta
 
 			opts.Destination = loc.Vnode.Id
 			//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
-			if _, er := lr.transport.CommitTx(loc, tx, opts); er != nil {
+			if _, er := lr.transport.CommitEntry(loc, tx, opts); er != nil {
 				err = er
 				break
 			}
@@ -163,7 +165,7 @@ func (lr *LogRing) CommitTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta
 			opts.Source = loc.Vnode.Id
 			opts.Destination = loc.Vnode.Id
 			//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
-			if _, er := lr.transport.CommitTx(loc, tx, opts); er != nil {
+			if _, er := lr.transport.CommitEntry(loc, tx, opts); er != nil {
 				err = er
 				break
 			}
@@ -174,15 +176,15 @@ func (lr *LogRing) CommitTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta
 	return meta, err
 }
 
-func (lr *LogRing) GetTx(id []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
+func (lr *LogRing) GetEntry(id []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
 
 	var (
-		tx   *hexalog.Tx
+		tx   *hexalog.Entry
 		meta *hexalog.Meta
 	)
 
 	err := lr.locator.RouteHash(id, int(opts.PeerSetSize), func(l *structs.Location) bool {
-		t, m, err := lr.transport.GetTx(l, id, opts)
+		t, m, err := lr.transport.GetEntry(l, id, opts)
 		if err == nil {
 			tx = t
 			meta = m

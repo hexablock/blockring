@@ -17,9 +17,6 @@ There are 2 main data categories.  This determines how data is written to the ri
 - [ ] Node leave
 - [ ] Replication
 - [ ] Compaction
-- [ ] Mutable data
-    - [ ] Log
-    - [ ] Consensus
 - [ ] Optimizations
 
 ## References

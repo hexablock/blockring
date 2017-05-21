@@ -22,15 +22,15 @@ service LocateRPC {
 }
 
 service LogRPC {
-    rpc NewTxRPC(LogRPCData) returns (LogRPCData) {}
-    rpc GetTxRPC(LogRPCData) returns (LogRPCData) {}
-    rpc ProposeTxRPC(LogRPCData) returns (LogRPCData) {}
-    rpc CommitTxRPC(LogRPCData) returns (LogRPCData) {}
+    rpc NewEntryRPC(LogRPCData) returns (LogRPCData) {}
+    rpc GetEntryRPC(LogRPCData) returns (LogRPCData) {}
+    rpc ProposeEntryRPC(LogRPCData) returns (LogRPCData) {}
+    rpc CommitEntryRPC(LogRPCData) returns (LogRPCData) {}
 }
 
 message LogRPCData {
     bytes Id = 1;
-    hexalog.Tx Tx= 2;
+    hexalog.Entry Entry = 2;
     hexalog.Options Options = 3;
     hexalog.Meta Meta = 4;
 }

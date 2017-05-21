@@ -17,14 +17,14 @@ func NewLogNetTransportClient(reapInterval, maxIdle int) *LogNetTransportClient 
 	return &LogNetTransportClient{out: pool.NewOutConnPool(reapInterval, maxIdle)}
 }
 
-func (c *LogNetTransportClient) ProposeTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
+func (c *LogNetTransportClient) ProposeEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, err
 	}
 
-	req := &rpc.LogRPCData{Tx: tx, Options: &opts}
-	resp, err := conn.LogRPC.ProposeTxRPC(context.Background(), req)
+	req := &rpc.LogRPCData{Entry: tx, Options: &opts}
+	resp, err := conn.LogRPC.ProposeEntryRPC(context.Background(), req)
 	c.out.Return(conn)
 	if err == nil {
 		return resp.Meta, nil
@@ -32,40 +32,40 @@ func (c *LogNetTransportClient) ProposeTx(loc *structs.Location, tx *hexalog.Tx,
 	return nil, err
 }
 
-func (c *LogNetTransportClient) NewTx(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
+func (c *LogNetTransportClient) NewEntry(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	req := &rpc.LogRPCData{Options: &opts, Id: key}
-	resp, err := conn.LogRPC.NewTxRPC(context.Background(), req)
+	resp, err := conn.LogRPC.NewEntryRPC(context.Background(), req)
 	c.out.Return(conn)
 
-	return resp.Tx, resp.Meta, err
+	return resp.Entry, resp.Meta, err
 }
 
-func (c *LogNetTransportClient) GetTx(loc *structs.Location, hash []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
+func (c *LogNetTransportClient) GetEntry(loc *structs.Location, hash []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	req := &rpc.LogRPCData{Id: hash, Options: &opts}
-	resp, err := conn.LogRPC.GetTxRPC(context.Background(), req)
+	resp, err := conn.LogRPC.GetEntryRPC(context.Background(), req)
 	c.out.Return(conn)
 
-	return resp.Tx, resp.Meta, err
+	return resp.Entry, resp.Meta, err
 }
 
-func (c *LogNetTransportClient) CommitTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
+func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, err
 	}
 
-	req := &rpc.LogRPCData{Tx: tx, Options: &opts}
-	resp, err := conn.LogRPC.CommitTxRPC(context.Background(), req)
+	req := &rpc.LogRPCData{Entry: tx, Options: &opts}
+	resp, err := conn.LogRPC.CommitEntryRPC(context.Background(), req)
 	c.out.Return(conn)
 	if err == nil {
 		return resp.Meta, nil
@@ -85,40 +85,40 @@ func NewLogNetTransport(host string, txl *hexalog.HexaLog) *LogNetTransport {
 	}
 }
 
-func (t *LogNetTransport) NewTxRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
-	tx, err := t.txl.NewTx(req.Id)
+func (t *LogNetTransport) NewEntryRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
+	tx, err := t.txl.NewEntry(req.Id)
 	if err == nil {
-		return &rpc.LogRPCData{Tx: tx}, nil
+		return &rpc.LogRPCData{Entry: tx}, nil
 	}
 	return &rpc.LogRPCData{}, err
 }
 
-func (t *LogNetTransport) GetTxRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
-	tx, meta, err := t.txl.GetTx(req.Id)
+func (t *LogNetTransport) GetEntryRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
+	tx, meta, err := t.txl.GetEntry(req.Id)
 	if err == nil {
-		return &rpc.LogRPCData{Tx: tx, Meta: meta}, nil
+		return &rpc.LogRPCData{Entry: tx, Meta: meta}, nil
 	}
 	return &rpc.LogRPCData{}, err
 }
 
-func (t *LogNetTransport) ProposeTxRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
+func (t *LogNetTransport) ProposeEntryRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
 	opts := *req.Options
 	// if opts.SourceHost == "" {
 	// 	opts.SourceHost = t.host
 	// }
 
-	if err := t.txl.ProposeTx(req.Tx, opts); err != nil {
+	if err := t.txl.ProposeEntry(req.Entry, opts); err != nil {
 		return &rpc.LogRPCData{}, err
 	}
 	return &rpc.LogRPCData{}, nil
 }
 
-func (t *LogNetTransport) CommitTxRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
+func (t *LogNetTransport) CommitEntryRPC(ctx context.Context, req *rpc.LogRPCData) (*rpc.LogRPCData, error) {
 	opts := *req.Options
 	// if opts.SourceHost == "" {
 	// 	opts.SourceHost = t.host
 	// }
-	if err := t.txl.CommitTx(req.Tx, opts); err != nil {
+	if err := t.txl.CommitEntry(req.Entry, opts); err != nil {
 		return &rpc.LogRPCData{}, err
 	}
 	return &rpc.LogRPCData{}, nil
@@ -137,31 +137,31 @@ func NewLogRingTransport(host string, txl *hexalog.HexaLog, remote LogTransport)
 	return &LogRingTransport{host: host, remote: remote, txl: txl}
 }
 
-func (lt *LogRingTransport) ProposeTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
+func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
-		return &hexalog.Meta{}, lt.txl.ProposeTx(tx, opts)
+		return &hexalog.Meta{}, lt.txl.ProposeEntry(tx, opts)
 	}
-	return lt.remote.ProposeTx(loc, tx, opts)
+	return lt.remote.ProposeEntry(loc, tx, opts)
 }
 
-func (lt *LogRingTransport) NewTx(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
+func (lt *LogRingTransport) NewEntry(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
-		tx, err := lt.txl.NewTx(key)
+		tx, err := lt.txl.NewEntry(key)
 		return tx, &hexalog.Meta{}, err
 	}
-	return lt.remote.NewTx(loc, key, opts)
+	return lt.remote.NewEntry(loc, key, opts)
 }
 
-func (lt *LogRingTransport) GetTx(loc *structs.Location, id []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
+func (lt *LogRingTransport) GetEntry(loc *structs.Location, id []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
-		return lt.txl.GetTx(id)
+		return lt.txl.GetEntry(id)
 	}
-	return lt.remote.GetTx(loc, id, opts)
+	return lt.remote.GetEntry(loc, id, opts)
 }
 
-func (lt *LogRingTransport) CommitTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
+func (lt *LogRingTransport) CommitEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
-		return &hexalog.Meta{}, lt.txl.CommitTx(tx, opts)
+		return &hexalog.Meta{}, lt.txl.CommitEntry(tx, opts)
 	}
-	return lt.remote.CommitTx(loc, tx, opts)
+	return lt.remote.CommitEntry(loc, tx, opts)
 }

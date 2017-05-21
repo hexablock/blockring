@@ -95,11 +95,11 @@ func (client *Client) LocateReplicatedKey(key []byte, r int) ([]*structs.Locatio
 	return client.locate.LocateReplicatedKey(client.GetPeer(), key, r)
 }
 
-func (client *Client) NewTx(key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
-	return client.lr.NewTx(key, opts)
+func (client *Client) NewEntry(key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
+	return client.lr.NewEntry(key, opts)
 }
-func (client *Client) ProposeTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
-	return client.lr.ProposeTx(tx, opts)
+func (client *Client) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
+	return client.lr.ProposeEntry(tx, opts)
 }
 
 // SetBlock sets the given block on the ring with the configured replication factor

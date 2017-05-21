@@ -7,6 +7,8 @@ import "github.com/ipkg/go-chord/net.proto";
 enum BlockType {
     ROOTBLOCK = 0;
     DATABLOCK = 1;
+    LOGBLOCK = 2;
+    LOGENTRYBLOCK = 3;
 }
 
 message Block {
