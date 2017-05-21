@@ -7,6 +7,7 @@ import (
 	"github.com/hexablock/blockring"
 	"github.com/hexablock/blockring/structs"
 	"github.com/hexablock/blockring/utils"
+	"github.com/hexablock/txlog"
 	chord "github.com/ipkg/go-chord"
 )
 
@@ -38,6 +39,7 @@ type Client struct {
 	conf   *Config
 	locate *blockring.LookupServiceClient
 	rs     *blockring.BlockRing
+	lr     *blockring.LogRing
 }
 
 // NewClient instantiates a new client
@@ -61,8 +63,11 @@ func NewClient(conf *Config) (*Client, error) {
 		c.conf.MaxSuccessors = isucc
 	}
 
-	transport := blockring.NewNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	c.rs = blockring.NewBlockRing(c, transport, nil)
+	blkTrans := blockring.NewBlockNetTransportClient(conf.ReapInterval, conf.MaxIdle)
+	c.rs = blockring.NewBlockRing(c, blkTrans, nil)
+
+	logTrans := blockring.NewLogNetTransportClient(conf.ReapInterval, conf.MaxIdle)
+	c.lr = blockring.NewLogRing(c, logTrans, nil)
 
 	return c, nil
 }
@@ -85,6 +90,16 @@ func (client *Client) LookupKey(key []byte, n int) ([]byte, *chord.Vnode, []*cho
 }
 func (client *Client) LocateReplicatedHash(hash []byte, r int) ([]*structs.Location, error) {
 	return client.locate.LocateReplicatedHash(client.GetPeer(), hash, r)
+}
+func (client *Client) LocateReplicatedKey(key []byte, r int) ([]*structs.Location, error) {
+	return client.locate.LocateReplicatedKey(client.GetPeer(), key, r)
+}
+
+func (client *Client) NewTx(key []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+	return client.lr.NewTx(key, opts)
+}
+func (client *Client) ProposeTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+	return client.lr.ProposeTx(tx, opts)
 }
 
 // SetBlock sets the given block on the ring with the configured replication factor

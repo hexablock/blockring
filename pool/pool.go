@@ -14,6 +14,7 @@ type OutConn struct {
 	conn      *grpc.ClientConn
 	BlockRPC  rpc.BlockRPCClient
 	LocateRPC rpc.LocateRPCClient
+	LogRPC    rpc.LogRPCClient
 	lastUsed  time.Time
 }
 
@@ -58,6 +59,7 @@ func (pool *OutConnPool) Get(host string) (*OutConn, error) {
 				host:      host,
 				BlockRPC:  rpc.NewBlockRPCClient(conn),
 				LocateRPC: rpc.NewLocateRPCClient(conn),
+				LogRPC:    rpc.NewLogRPCClient(conn),
 				conn:      conn,
 				lastUsed:  time.Now(),
 			}, nil

@@ -3,6 +3,7 @@ syntax = "proto3";
 package rpc;
 
 import "github.com/hexablock/blockring/structs/structs.proto";
+import "github.com/hexablock/txlog/types.proto";
 import "github.com/ipkg/go-chord/net.proto";
 
 service BlockRPC {
@@ -18,6 +19,20 @@ service LocateRPC {
     rpc LocateReplicatedKeyRPC(LocateRequest) returns (LocateResponse) {}
     rpc LocateReplicatedHashRPC(LocateRequest) returns (LocateResponse) {}
     rpc NegotiateRPC(NegotiateRequest) returns (NegotiateResponse) {}
+}
+
+service LogRPC {
+    rpc NewTxRPC(LogRPCData) returns (LogRPCData) {}
+    rpc GetTxRPC(LogRPCData) returns (LogRPCData) {}
+    rpc ProposeTxRPC(LogRPCData) returns (LogRPCData) {}
+    rpc CommitTxRPC(LogRPCData) returns (LogRPCData) {}
+}
+
+message LogRPCData {
+    bytes Id = 1;
+    txlog.Tx Tx= 2;
+    txlog.Options Options = 3;
+    txlog.Meta Meta = 4;
 }
 
 message BlockRPCData{

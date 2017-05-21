@@ -13,10 +13,11 @@ import (
 )
 
 type ChordDelegate struct {
-	Store *StoreTransport
+	Store *BlockRingTransport
 
 	ring      *ChordRing
 	blockRing *BlockRing
+	logRing   *LogRing
 
 	// Incoming candidate blocks to be locally stored i.e. taken over. These are either stored or
 	// forwarded based on location ID
@@ -33,10 +34,10 @@ func NewChordDelegate(peerStore store.PeerStore, inBlockBufSize int) *ChordDeleg
 }
 
 // Register registers the chord ring to the delegate and starts processing incoming blocks
-func (s *ChordDelegate) Register(ring *ChordRing, blockRing *BlockRing) {
-	//s.ring = ring
-	s.blockRing = blockRing
+func (s *ChordDelegate) Register(ring *ChordRing, blockRing *BlockRing, logRing *LogRing) {
 	s.ring = ring
+	s.blockRing = blockRing
+	s.logRing = logRing
 
 	go s.startConsuming()
 }
