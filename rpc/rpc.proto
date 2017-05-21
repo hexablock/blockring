@@ -3,7 +3,7 @@ syntax = "proto3";
 package rpc;
 
 import "github.com/hexablock/blockring/structs/structs.proto";
-import "github.com/hexablock/txlog/types.proto";
+import "github.com/hexablock/hexalog/types.proto";
 import "github.com/ipkg/go-chord/net.proto";
 
 service BlockRPC {
@@ -30,9 +30,9 @@ service LogRPC {
 
 message LogRPCData {
     bytes Id = 1;
-    txlog.Tx Tx= 2;
-    txlog.Options Options = 3;
-    txlog.Meta Meta = 4;
+    hexalog.Tx Tx= 2;
+    hexalog.Options Options = 3;
+    hexalog.Meta Meta = 4;
 }
 
 message BlockRPCData{

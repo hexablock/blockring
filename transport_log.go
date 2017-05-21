@@ -6,7 +6,7 @@ import (
 	"github.com/hexablock/blockring/pool"
 	"github.com/hexablock/blockring/rpc"
 	"github.com/hexablock/blockring/structs"
-	"github.com/hexablock/txlog"
+	"github.com/hexablock/hexalog"
 )
 
 type LogNetTransportClient struct {
@@ -17,7 +17,7 @@ func NewLogNetTransportClient(reapInterval, maxIdle int) *LogNetTransportClient 
 	return &LogNetTransportClient{out: pool.NewOutConnPool(reapInterval, maxIdle)}
 }
 
-func (c *LogNetTransportClient) ProposeTx(loc *structs.Location, tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+func (c *LogNetTransportClient) ProposeTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (c *LogNetTransportClient) ProposeTx(loc *structs.Location, tx *txlog.Tx, o
 	return nil, err
 }
 
-func (c *LogNetTransportClient) NewTx(loc *structs.Location, key []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+func (c *LogNetTransportClient) NewTx(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, nil, err
@@ -45,7 +45,7 @@ func (c *LogNetTransportClient) NewTx(loc *structs.Location, key []byte, opts tx
 	return resp.Tx, resp.Meta, err
 }
 
-func (c *LogNetTransportClient) GetTx(loc *structs.Location, hash []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+func (c *LogNetTransportClient) GetTx(loc *structs.Location, hash []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, nil, err
@@ -58,7 +58,7 @@ func (c *LogNetTransportClient) GetTx(loc *structs.Location, hash []byte, opts t
 	return resp.Tx, resp.Meta, err
 }
 
-func (c *LogNetTransportClient) CommitTx(loc *structs.Location, tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+func (c *LogNetTransportClient) CommitTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, err
@@ -75,10 +75,10 @@ func (c *LogNetTransportClient) CommitTx(loc *structs.Location, tx *txlog.Tx, op
 
 type LogNetTransport struct {
 	host string
-	txl  *txlog.TxLog
+	txl  *hexalog.HexaLog
 }
 
-func NewLogNetTransport(host string, txl *txlog.TxLog) *LogNetTransport {
+func NewLogNetTransport(host string, txl *hexalog.HexaLog) *LogNetTransport {
 	return &LogNetTransport{
 		txl:  txl,
 		host: host,
@@ -126,42 +126,42 @@ func (t *LogNetTransport) CommitTxRPC(ctx context.Context, req *rpc.LogRPCData) 
 
 type LogRingTransport struct {
 	host   string
-	txl    *txlog.TxLog
+	txl    *hexalog.HexaLog
 	remote LogTransport
 }
 
-func NewLogRingTransport(host string, txl *txlog.TxLog, remote LogTransport) *LogRingTransport {
+func NewLogRingTransport(host string, txl *hexalog.HexaLog, remote LogTransport) *LogRingTransport {
 	if remote == nil {
 		return &LogRingTransport{host: host, remote: NewLogNetTransportClient(30, 180), txl: txl}
 	}
 	return &LogRingTransport{host: host, remote: remote, txl: txl}
 }
 
-func (lt *LogRingTransport) ProposeTx(loc *structs.Location, tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+func (lt *LogRingTransport) ProposeTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
-		return &txlog.Meta{}, lt.txl.ProposeTx(tx, opts)
+		return &hexalog.Meta{}, lt.txl.ProposeTx(tx, opts)
 	}
 	return lt.remote.ProposeTx(loc, tx, opts)
 }
 
-func (lt *LogRingTransport) NewTx(loc *structs.Location, key []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+func (lt *LogRingTransport) NewTx(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
 		tx, err := lt.txl.NewTx(key)
-		return tx, &txlog.Meta{}, err
+		return tx, &hexalog.Meta{}, err
 	}
 	return lt.remote.NewTx(loc, key, opts)
 }
 
-func (lt *LogRingTransport) GetTx(loc *structs.Location, id []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+func (lt *LogRingTransport) GetTx(loc *structs.Location, id []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
 		return lt.txl.GetTx(id)
 	}
 	return lt.remote.GetTx(loc, id, opts)
 }
 
-func (lt *LogRingTransport) CommitTx(loc *structs.Location, tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+func (lt *LogRingTransport) CommitTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
 	if lt.host == loc.Vnode.Host {
-		return &txlog.Meta{}, lt.txl.CommitTx(tx, opts)
+		return &hexalog.Meta{}, lt.txl.CommitTx(tx, opts)
 	}
 	return lt.remote.CommitTx(loc, tx, opts)
 }

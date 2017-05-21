@@ -7,15 +7,15 @@ import (
 
 	"github.com/hexablock/blockring/rpc"
 	"github.com/hexablock/blockring/structs"
-	"github.com/hexablock/txlog"
+	"github.com/hexablock/hexalog"
 	"github.com/ipkg/difuse/utils"
 )
 
 type LogTransport interface {
-	ProposeTx(loc *structs.Location, tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error)
-	NewTx(loc *structs.Location, key []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error)
-	GetTx(loc *structs.Location, hash []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error)
-	CommitTx(loc *structs.Location, tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error)
+	ProposeTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error)
+	NewTx(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error)
+	GetTx(loc *structs.Location, hash []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error)
+	CommitTx(loc *structs.Location, tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error)
 }
 
 // LogRing is the core interface to perform operations around the ring.
@@ -44,7 +44,7 @@ func NewLogRing(locator Locator, trans LogTransport, ch chan<- *rpc.BlockRPCData
 	return rs
 }
 
-func (lr *LogRing) NewTx(key []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+func (lr *LogRing) NewTx(key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
 	keyHash, _, succs, err := lr.locator.LookupKey(key, 1)
 	if err != nil {
 		return nil, nil, err
@@ -54,7 +54,7 @@ func (lr *LogRing) NewTx(key []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta
 }
 
 // ProposeTx proposes a transaction to the network.
-func (lr *LogRing) ProposeTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+func (lr *LogRing) ProposeTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
 
 	locs, err := lr.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
@@ -66,7 +66,7 @@ func (lr *LogRing) ProposeTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, err
 		errCh = make(chan error, len(locs))
 		done  = make(chan struct{})
 		bail  int32
-		meta  *txlog.Meta
+		meta  *hexalog.Meta
 	)
 
 	wg.Add(len(locs))
@@ -79,7 +79,7 @@ func (lr *LogRing) ProposeTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, err
 
 				if atomic.LoadInt32(&bail) == 0 {
 					if !utils.EqualBytes(loc.Vnode.Id, opts.Source) {
-						o := txlog.Options{
+						o := hexalog.Options{
 							Destination: loc.Vnode.Id,
 							Source:      opts.Source,
 							PeerSetSize: opts.PeerSetSize,
@@ -103,7 +103,7 @@ func (lr *LogRing) ProposeTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, err
 			go func(loc *structs.Location) {
 
 				if atomic.LoadInt32(&bail) == 0 {
-					o := txlog.Options{
+					o := hexalog.Options{
 						Destination: loc.Vnode.Id,
 						Source:      loc.Vnode.Id,
 						PeerSetSize: opts.PeerSetSize,
@@ -135,13 +135,13 @@ func (lr *LogRing) ProposeTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, err
 	return meta, err
 }
 
-func (lr *LogRing) CommitTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+func (lr *LogRing) CommitTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
 	locs, err := lr.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
 		return nil, err
 	}
 
-	var meta *txlog.Meta
+	var meta *hexalog.Meta
 	if opts.Source != nil && len(opts.Source) > 0 {
 		// Broadcast to all vnodes skipping the source.
 		for _, loc := range locs {
@@ -174,11 +174,11 @@ func (lr *LogRing) CommitTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, erro
 	return meta, err
 }
 
-func (lr *LogRing) GetTx(id []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+func (lr *LogRing) GetTx(id []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
 
 	var (
-		tx   *txlog.Tx
-		meta *txlog.Meta
+		tx   *hexalog.Tx
+		meta *hexalog.Meta
 	)
 
 	err := lr.locator.RouteHash(id, int(opts.PeerSetSize), func(l *structs.Location) bool {

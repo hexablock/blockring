@@ -7,7 +7,7 @@ import (
 	"github.com/hexablock/blockring"
 	"github.com/hexablock/blockring/structs"
 	"github.com/hexablock/blockring/utils"
-	"github.com/hexablock/txlog"
+	"github.com/hexablock/hexalog"
 	chord "github.com/ipkg/go-chord"
 )
 
@@ -95,10 +95,10 @@ func (client *Client) LocateReplicatedKey(key []byte, r int) ([]*structs.Locatio
 	return client.locate.LocateReplicatedKey(client.GetPeer(), key, r)
 }
 
-func (client *Client) NewTx(key []byte, opts txlog.Options) (*txlog.Tx, *txlog.Meta, error) {
+func (client *Client) NewTx(key []byte, opts hexalog.Options) (*hexalog.Tx, *hexalog.Meta, error) {
 	return client.lr.NewTx(key, opts)
 }
-func (client *Client) ProposeTx(tx *txlog.Tx, opts txlog.Options) (*txlog.Meta, error) {
+func (client *Client) ProposeTx(tx *hexalog.Tx, opts hexalog.Options) (*hexalog.Meta, error) {
 	return client.lr.ProposeTx(tx, opts)
 }
 
