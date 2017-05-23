@@ -7,15 +7,15 @@ import (
 
 	"github.com/hexablock/blockring/rpc"
 	"github.com/hexablock/blockring/structs"
-	"github.com/hexablock/hexalog"
-	"github.com/ipkg/difuse/utils"
+	"github.com/hexablock/blockring/utils"
 )
 
+// LogTransport implements a transport for the distributed log
 type LogTransport interface {
-	ProposeEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error)
-	NewEntry(loc *structs.Location, key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error)
-	GetEntry(loc *structs.Location, hash []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error)
-	CommitEntry(loc *structs.Location, tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error)
+	ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
+	NewEntry(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error)
+	GetEntry(loc *structs.Location, hash []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error)
+	CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
 }
 
 // LogRing is the core interface to perform operations around the ring.
@@ -44,7 +44,8 @@ func NewLogRing(locator Locator, trans LogTransport, ch chan<- *rpc.BlockRPCData
 	return rs
 }
 
-func (lr *LogRing) NewEntry(key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
+// NewEntry gets a new entry from the log.
+func (lr *LogRing) NewEntry(key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
 	keyHash, _, succs, err := lr.locator.LookupKey(key, 1)
 	if err != nil {
 		return nil, nil, err
@@ -53,8 +54,8 @@ func (lr *LogRing) NewEntry(key []byte, opts hexalog.Options) (*hexalog.Entry, *
 	return lr.transport.NewEntry(loc, key, opts)
 }
 
-// ProposeTx proposes a transaction to the network.
-func (lr *LogRing) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
+// ProposeEntry proposes a transaction to the network.
+func (lr *LogRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 
 	locs, err := lr.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
@@ -66,7 +67,7 @@ func (lr *LogRing) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexal
 		errCh = make(chan error, len(locs))
 		done  = make(chan struct{})
 		bail  int32
-		meta  *hexalog.Meta
+		meta  *structs.Location
 	)
 
 	wg.Add(len(locs))
@@ -79,7 +80,7 @@ func (lr *LogRing) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexal
 
 				if atomic.LoadInt32(&bail) == 0 {
 					if !utils.EqualBytes(loc.Vnode.Id, opts.Source) {
-						o := hexalog.Options{
+						o := structs.RequestOptions{
 							Destination: loc.Vnode.Id,
 							Source:      opts.Source,
 							PeerSetSize: opts.PeerSetSize,
@@ -103,7 +104,7 @@ func (lr *LogRing) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexal
 			go func(loc *structs.Location) {
 
 				if atomic.LoadInt32(&bail) == 0 {
-					o := hexalog.Options{
+					o := structs.RequestOptions{
 						Destination: loc.Vnode.Id,
 						Source:      loc.Vnode.Id,
 						PeerSetSize: opts.PeerSetSize,
@@ -135,7 +136,7 @@ func (lr *LogRing) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexal
 	return meta, err
 }
 
-func (lr *LogRing) CommitEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
+func (lr *LogRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	locs, err := lr.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
 		return nil, err
@@ -143,7 +144,7 @@ func (lr *LogRing) CommitEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalo
 
 	// TODO: call concurrently
 
-	var meta *hexalog.Meta
+	var meta *structs.Location
 	if opts.Source != nil && len(opts.Source) > 0 {
 		// Broadcast to all vnodes skipping the source.
 		for _, loc := range locs {
@@ -176,11 +177,12 @@ func (lr *LogRing) CommitEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalo
 	return meta, err
 }
 
-func (lr *LogRing) GetEntry(id []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
+// GetEntry gets a log entry from the ring.
+func (lr *LogRing) GetEntry(id []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
 
 	var (
-		tx   *hexalog.Entry
-		meta *hexalog.Meta
+		tx   *structs.LogEntryBlock
+		meta *structs.Location
 	)
 
 	err := lr.locator.RouteHash(id, int(opts.PeerSetSize), func(l *structs.Location) bool {

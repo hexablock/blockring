@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	"github.com/btcsuite/fastsha256"
-	"github.com/hexablock/blockring/utils"
 )
 
 var (
@@ -22,6 +21,9 @@ func (blk *Block) MarshalBinary() ([]byte, error) {
 	binary.BigEndian.PutUint32(b, uint32(blk.Type))
 	return append([]byte{b[3]}, blk.Data...), nil
 }
+
+// UnmarshalBinary unmarshals bytes into a block.  The first byte is the type with the remainder
+// being the data.
 func (blk *Block) UnmarshalBinary(b []byte) error {
 	if len(b) < 2 {
 		return ErrInvalidBlockType
@@ -42,14 +44,9 @@ func (blk *Block) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// ID return the hash of the block
+// ID returns the hash id of the block
 func (blk *Block) ID() []byte {
-	bs := make([]byte, 2)
-	binary.BigEndian.PutUint16(bs, uint16(blk.Type))
-
-	d := utils.ConcatByteSlices(bs, blk.Data)
-	//d := append(bs, blk.Data...)
-
+	d, _ := blk.MarshalBinary()
 	sh := fastsha256.Sum256(d)
 	return sh[:]
 }

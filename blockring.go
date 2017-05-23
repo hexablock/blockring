@@ -44,16 +44,16 @@ func (br *BlockRing) EnableProximityShifting(enable bool) {
 }
 
 // SetBlock writes the block to the ring with the specified replicas
-func (br *BlockRing) SetBlock(block *structs.Block, opts ...RequestOptions) (*structs.Location, error) {
+func (br *BlockRing) SetBlock(block *structs.Block, opts ...structs.RequestOptions) (*structs.Location, error) {
 
-	o := DefaultRequestOptions()
+	o := structs.DefaultRequestOptions()
 	if len(opts) > 0 {
-		o = opts[0]
+		o = &opts[0]
 	}
 
 	id := block.ID()
 
-	_, vns, err := br.locator.LookupHash(id, o.PeerRange)
+	_, vns, err := br.locator.LookupHash(id, int(o.PeerSetSize))
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (br *BlockRing) SetBlock(block *structs.Block, opts ...RequestOptions) (*st
 }
 
 // GetRootBlock gets a root block with the given id
-func (br *BlockRing) GetRootBlock(id []byte, opts ...RequestOptions) (*structs.Location, *structs.RootBlock, error) {
+func (br *BlockRing) GetRootBlock(id []byte, opts ...structs.RequestOptions) (*structs.Location, *structs.RootBlock, error) {
 	loc, block, err := br.GetBlock(id, opts...)
 	if err == nil {
 		var rb structs.RootBlock
@@ -75,10 +75,10 @@ func (br *BlockRing) GetRootBlock(id []byte, opts ...RequestOptions) (*structs.L
 }
 
 // GetBlock lookups up the id hash then uses upto max successors to find the block.
-func (br *BlockRing) GetBlock(id []byte, opts ...RequestOptions) (*structs.Location, *structs.Block, error) {
-	o := DefaultRequestOptions()
+func (br *BlockRing) GetBlock(id []byte, opts ...structs.RequestOptions) (*structs.Location, *structs.Block, error) {
+	o := structs.DefaultRequestOptions()
 	if len(opts) > 0 {
-		o = opts[0]
+		o = &opts[0]
 	}
 
 	var (
@@ -86,7 +86,7 @@ func (br *BlockRing) GetBlock(id []byte, opts ...RequestOptions) (*structs.Locat
 		loc *structs.Location
 	)
 
-	err := br.locator.RouteHash(id, o.PeerRange, func(l *structs.Location) bool {
+	err := br.locator.RouteHash(id, int(o.PeerSetSize), func(l *structs.Location) bool {
 		if b, err := br.blkTrans.GetBlock(l, id); err == nil {
 			blk = b
 			loc = l

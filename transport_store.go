@@ -7,24 +7,13 @@ import (
 
 	"github.com/hexablock/blockring/pool"
 	"github.com/hexablock/blockring/rpc"
+	"github.com/hexablock/blockring/store"
 	"github.com/hexablock/blockring/structs"
 )
 
 var (
 	errNoLocalTransfer = errors.New("local transfers not allowed")
 )
-
-// BlockStore implements a block storage interface
-type BlockStore interface {
-	GetBlock(id []byte) (*structs.Block, error)
-	SetBlock(block *structs.Block) error
-	// Marks a block to be released from the store.
-	ReleaseBlock(id []byte) error
-	// Iterate over all blocks
-	IterBlocks(f func(block *structs.Block) error) error
-	// Iteraters over all blocks in the store
-	IterBlockIDs(f func([]byte) error) error
-}
 
 // BlockStoreTransport implements the transport interface for the block store.
 type BlockTransport interface {
@@ -101,12 +90,12 @@ func (s *BlockNetTransportClient) ReleaseBlock(loc *structs.Location, id []byte)
 }
 
 type BlockNetTransport struct {
-	st BlockStore
+	st store.BlockStore
 	// potential inbound blocks
 	inBlocks chan *rpc.BlockRPCData
 }
 
-func NewBlockNetTransport(bs BlockStore) *BlockNetTransport {
+func NewBlockNetTransport(bs store.BlockStore) *BlockNetTransport {
 	return &BlockNetTransport{st: bs}
 }
 
@@ -144,11 +133,11 @@ func (s *BlockNetTransport) ReleaseBlockRPC(ctx context.Context, in *rpc.BlockRP
 // BlockRingTransport allows to make requests based on Location around the ring.
 type BlockRingTransport struct {
 	host   string
-	local  BlockStore
+	local  store.BlockStore
 	remote BlockTransport
 }
 
-func NewBlockRingTransport(hostname string, local BlockStore, remote BlockTransport) *BlockRingTransport {
+func NewBlockRingTransport(hostname string, local store.BlockStore, remote BlockTransport) *BlockRingTransport {
 	//remote.RegisterStore(local)
 	st := &BlockRingTransport{host: hostname, local: local, remote: remote}
 	if st.remote == nil {

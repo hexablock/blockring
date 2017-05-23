@@ -22,10 +22,9 @@ message Location {
     chord.Vnode Vnode = 3;
 }
 
-message Reference {
-    bytes Previous = 1;
-    bytes Data = 2;
-    uint32 Mode = 3;
-    string Name = 4;
-    bytes Inline = 5;
+message RequestOptions {
+    bytes PeerSetKey = 1;
+	int32 PeerSetSize = 2;
+	bytes Source = 3;
+    bytes Destination = 4;
 }

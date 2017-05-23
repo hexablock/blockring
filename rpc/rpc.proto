@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package rpc;
 
+//import "github.com/hexablock/hexalog/types.proto";
 import "github.com/hexablock/blockring/structs/structs.proto";
-import "github.com/hexablock/hexalog/types.proto";
 import "github.com/ipkg/go-chord/net.proto";
 
 service BlockRPC {
@@ -22,23 +22,17 @@ service LocateRPC {
 }
 
 service LogRPC {
-    rpc NewEntryRPC(LogRPCData) returns (LogRPCData) {}
-    rpc GetEntryRPC(LogRPCData) returns (LogRPCData) {}
-    rpc ProposeEntryRPC(LogRPCData) returns (LogRPCData) {}
-    rpc CommitEntryRPC(LogRPCData) returns (LogRPCData) {}
-}
-
-message LogRPCData {
-    bytes Id = 1;
-    hexalog.Entry Entry = 2;
-    hexalog.Options Options = 3;
-    hexalog.Meta Meta = 4;
+    rpc NewEntryRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc GetEntryRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc ProposeEntryRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc CommitEntryRPC(BlockRPCData) returns (BlockRPCData) {}
 }
 
 message BlockRPCData{
     bytes ID = 1;
     structs.Block Block = 2;
     structs.Location Location = 3;
+    structs.RequestOptions Options = 4;
 }
 
 message LocateRequest {

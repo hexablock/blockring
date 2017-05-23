@@ -11,6 +11,18 @@ var (
 	errNotFound = errors.New("not found")
 )
 
+// BlockStore implements a block storage interface
+type BlockStore interface {
+	GetBlock(id []byte) (*structs.Block, error)
+	SetBlock(block *structs.Block) error
+	// Marks a block to be released from the store.
+	ReleaseBlock(id []byte) error
+	// Iterate over all blocks
+	IterBlocks(f func(block *structs.Block) error) error
+	// Iteraters over all blocks in the store
+	IterBlockIDs(f func([]byte) error) error
+}
+
 // MemBlockStore is an in-memory block store.
 type MemBlockStore struct {
 	mu sync.RWMutex

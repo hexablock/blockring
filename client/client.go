@@ -7,7 +7,6 @@ import (
 	"github.com/hexablock/blockring"
 	"github.com/hexablock/blockring/structs"
 	"github.com/hexablock/blockring/utils"
-	"github.com/hexablock/hexalog"
 	chord "github.com/ipkg/go-chord"
 )
 
@@ -95,19 +94,19 @@ func (client *Client) LocateReplicatedKey(key []byte, r int) ([]*structs.Locatio
 	return client.locate.LocateReplicatedKey(client.GetPeer(), key, r)
 }
 
-func (client *Client) NewEntry(key []byte, opts hexalog.Options) (*hexalog.Entry, *hexalog.Meta, error) {
+func (client *Client) NewEntry(key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
 	return client.lr.NewEntry(key, opts)
 }
-func (client *Client) ProposeEntry(tx *hexalog.Entry, opts hexalog.Options) (*hexalog.Meta, error) {
+func (client *Client) ProposeEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	return client.lr.ProposeEntry(tx, opts)
 }
 
 // SetBlock sets the given block on the ring with the configured replication factor
-func (client *Client) SetBlock(block *structs.Block, opts ...blockring.RequestOptions) (*structs.Location, error) {
+func (client *Client) SetBlock(block *structs.Block, opts ...structs.RequestOptions) (*structs.Location, error) {
 	return client.rs.SetBlock(block, opts...)
 }
 
 // GetBlock gets a block given the id.  It returns the first available block.
-func (client *Client) GetBlock(id []byte, opts ...blockring.RequestOptions) (*structs.Location, *structs.Block, error) {
+func (client *Client) GetBlock(id []byte, opts ...structs.RequestOptions) (*structs.Location, *structs.Block, error) {
 	return client.rs.GetBlock(id, opts...)
 }
