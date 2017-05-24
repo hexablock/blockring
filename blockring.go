@@ -186,8 +186,9 @@ func (br *BlockRing) NewEntry(key []byte, opts structs.RequestOptions) (*structs
 	if err != nil {
 		return nil, nil, err
 	}
-	loc := &structs.Location{Id: keyHash, Vnode: succs[0]}
-	return br.logTrans.NewEntry(loc, key, opts)
+	loc := &structs.Location{Id: keyHash, Vnode: succs[0], Priority: 0}
+	blk, _, err := br.logTrans.NewEntry(loc, key, opts)
+	return blk, loc, err
 }
 
 // ProposeEntry proposes a transaction to the network.
