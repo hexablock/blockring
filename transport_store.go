@@ -15,20 +15,23 @@ var (
 	errNoLocalTransfer = errors.New("local transfers not allowed")
 )
 
-// BlockStoreTransport implements the transport interface for the block store.
-type BlockTransport interface {
-	GetBlock(loc *structs.Location, id []byte) (*structs.Block, error)
-	SetBlock(loc *structs.Location, block *structs.Block) error
-	TransferBlock(loc *structs.Location, id []byte) error
-	ReleaseBlock(loc *structs.Location, id []byte) error
-}
-
 type BlockNetTransportClient struct {
 	out *pool.OutConnPool
 }
 
 func NewBlockNetTransportClient(reapInterval, maxIdle int) *BlockNetTransportClient {
 	return &BlockNetTransportClient{out: pool.NewOutConnPool(reapInterval, maxIdle)}
+}
+
+func (s *BlockNetTransportClient) GetEntry(loc *structs.Location, id []byte) (*structs.LogEntryBlock, error) {
+	blk, err := s.GetBlock(loc, id)
+	if err == nil {
+		var le structs.LogEntryBlock
+		err = le.DecodeBlock(blk)
+		return &le, err
+	}
+
+	return nil, err
 }
 
 func (s *BlockNetTransportClient) GetBlock(loc *structs.Location, id []byte) (*structs.Block, error) {

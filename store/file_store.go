@@ -4,8 +4,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/hexablock/blockring/structs"
 )
@@ -13,10 +16,21 @@ import (
 type FileBlockStore struct {
 	datadir        string
 	defaultSetPerm os.FileMode
+
+	mu            sync.RWMutex
+	buf           map[string]*structs.Block
+	flushInterval time.Duration
 }
 
 func NewFileBlockStore(datadir string) *FileBlockStore {
-	return &FileBlockStore{datadir: datadir, defaultSetPerm: 0444}
+	fbs := &FileBlockStore{
+		datadir:        datadir,
+		defaultSetPerm: 0444,
+		flushInterval:  30 * time.Second,
+		buf:            make(map[string]*structs.Block),
+	}
+	go fbs.flushBlocks()
+	return fbs
 }
 
 func (st *FileBlockStore) abspath(p string) string {
@@ -25,11 +39,49 @@ func (st *FileBlockStore) abspath(p string) string {
 
 // GetBlock returns a block with the given id if it exists
 func (st *FileBlockStore) GetBlock(id []byte) (*structs.Block, error) {
+	st.mu.RLock()
+	if v, ok := st.buf[string(id)]; ok {
+		st.mu.RUnlock()
+		return v, nil
+	}
+	st.mu.RUnlock()
+
 	ap := st.abspath(hex.EncodeToString(id))
 	return st.readBlockFromFile(ap)
 }
 
+func (st *FileBlockStore) flushBlocks() {
+	for {
+		time.Sleep(st.flushInterval)
+		// write all in-mem blocks to disk removing from in-mem on success
+		st.mu.Lock()
+		for k, v := range st.buf {
+			if err := st.writeBlockToFile(v); err != nil {
+				log.Println("ERR", err)
+				continue
+			}
+			delete(st.buf, k)
+		}
+		st.mu.Unlock()
+	}
+}
+
 func (st *FileBlockStore) IterBlockIDs(f func(id []byte) error) error {
+	i := 0
+	st.mu.RLock()
+	inMem := make([][]byte, len(st.buf))
+	for k := range st.buf {
+		inMem[i] = []byte(k)
+		i++
+	}
+	st.mu.RUnlock()
+
+	for _, v := range inMem {
+		if err := f(v); err != nil {
+			return err
+		}
+	}
+
 	files, err := ioutil.ReadDir(st.datadir)
 	if err != nil {
 		return err
@@ -57,6 +109,14 @@ func (st *FileBlockStore) IterBlockIDs(f func(id []byte) error) error {
 // IterBlocks iterates over blocks in theh store.  If an error is returned by the callback
 // iteration is immediately terminated returning the error.
 func (st *FileBlockStore) IterBlocks(f func(block *structs.Block) error) error {
+	// read in-mem blocks
+	st.mu.RLock()
+	for _, v := range st.buf {
+		if err := f(v); err != nil {
+			return err
+		}
+	}
+	st.mu.RUnlock()
 
 	files, err := ioutil.ReadDir(st.datadir)
 	if err != nil {
@@ -87,9 +147,14 @@ func (st *FileBlockStore) IterBlocks(f func(block *structs.Block) error) error {
 	return err
 }
 
-// SetBlock writes the given block to the store returning an error on failure
+// SetBlock writes the given block to memory which later gets flushed to disk
 func (st *FileBlockStore) SetBlock(blk *structs.Block) error {
-	return st.writeBlockToFile(blk)
+	id := string(blk.ID())
+	st.mu.Lock()
+	st.buf[id] = blk
+	st.mu.Unlock()
+
+	return nil
 }
 
 // ReleaseBlock marks a block to be released (eventually removed) from the store.
@@ -109,12 +174,16 @@ func (st *FileBlockStore) ReleaseBlock(id []byte) error {
 func (st *FileBlockStore) writeBlockToFile(blk *structs.Block) error {
 	bid := blk.ID()
 	fp := st.abspath(hex.EncodeToString(bid))
-	if _, err := os.Stat(fp); err == nil {
-		return nil
+
+	_, err := os.Stat(fp)
+	if err != nil {
+		if os.IsNotExist(err) {
+			data, _ := blk.MarshalBinary()
+			return ioutil.WriteFile(fp, data, st.defaultSetPerm)
+		}
 	}
-	// TODO: don't write block if it exists
-	data, _ := blk.MarshalBinary()
-	return ioutil.WriteFile(fp, data, st.defaultSetPerm)
+
+	return err
 }
 
 func (st *FileBlockStore) readBlockFromFile(fp string) (*structs.Block, error) {

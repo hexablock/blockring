@@ -21,6 +21,15 @@ type LogEntryHeader struct {
 	Height    uint64
 }
 
+func (header LogEntryHeader) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"PrevHash":  hex.EncodeToString(header.PrevHash),
+		"Source":    hex.EncodeToString(header.Source),
+		"Height":    header.Height,
+		"Timestamp": header.Timestamp,
+	})
+}
+
 type LogEntryBlock struct {
 	Key       []byte
 	Header    *LogEntryHeader
@@ -71,7 +80,7 @@ func (m *LogEntryHeader) UnmarshalBinary(b []byte) error {
 
 // NewLogEntryBlock instantiates a new LogEntryBlock given the key, previous hash, data
 func NewLogEntryBlock(key, prevHash, data []byte) *LogEntryBlock {
-	tx := &LogEntryBlock{
+	entry := &LogEntryBlock{
 		Key: key,
 		Header: &LogEntryHeader{
 			PrevHash:  prevHash,
@@ -80,83 +89,79 @@ func NewLogEntryBlock(key, prevHash, data []byte) *LogEntryBlock {
 		Data: data,
 	}
 	if utils.IsZeroHash(prevHash) {
-		tx.Header.Height = 1
+		entry.Header.Height = 1
 	}
-	return tx
+	return entry
 }
 
 // EncodeBlock encodes a LogEntryBlock into a Block
-func (tx *LogEntryBlock) EncodeBlock() (*Block, error) {
-	b, _ := tx.MarshalBinary()
-	return &Block{Type: BlockType_LOGENTRYBLOCK, Data: b}, nil
+func (entry *LogEntryBlock) EncodeBlock() (*Block, error) {
+	b, _ := entry.MarshalBinary()
+	return &Block{Type: BlockType_LOGENTRY, Data: b}, nil
 }
 
 // DecodeBlock decodes a block to a LogEntryBlock
-func (tx *LogEntryBlock) DecodeBlock(block *Block) error {
-	if block.Type == BlockType_LOGENTRYBLOCK {
-		return tx.UnmarshalBinary(block.Data)
+func (entry *LogEntryBlock) DecodeBlock(block *Block) error {
+	if block.Type == BlockType_LOGENTRY {
+		return entry.UnmarshalBinary(block.Data)
 	}
 	return ErrInvalidBlockType
 }
 
 // DataHash of the tx data
-// func (tx *LogEntryBlock) DataHash() []byte {
-// 	s := fastsha256.Sum256(tx.Data)
+// func (entry *LogEntryBlock) DataHash() []byte {
+// 	s := fastsha256.Sum256(entry.Data)
 // 	return s[:]
 // }
 
 // bytesToGenHash returns the byte slice that should be used to generate the hash
-// func (tx *LogEntryBlock) bytesToGenHash() []byte {
-// 	headerBytes, _ := tx.Header.MarshalBinary()
-// 	return utils.ConcatByteSlices(tx.Key, headerBytes, tx.DataHash())
+// func (entry *LogEntryBlock) bytesToGenHash() []byte {
+// 	headerBytes, _ := entry.Header.MarshalBinary()
+// 	return utils.ConcatByteSlices(entry.Key, headerBytes, entry.DataHash())
 // }
 
 // ID returns the entry id by hashing the data.
-func (tx *LogEntryBlock) ID() []byte {
-	// d := tx.bytesToGenHash()
+func (entry *LogEntryBlock) ID() []byte {
+	// d := entry.bytesToGenHash()
 	// s := fastsha256.Sum256(d)
 	// return s[:]
-	b, _ := tx.EncodeBlock()
+	b, _ := entry.EncodeBlock()
 	return b.ID()
 }
 
 // Sign transaction
-/*func (tx *LogEntryBlock) Sign(signer Signator) error {
-	tx.Header.Source = signer.PublicKey().Bytes()
+/*func (entry *LogEntryBlock) Sign(signer Signator) error {
+	entry.Header.Source = signer.PublicKey().Bytes()
 
-	sig, err := signer.Sign(tx.Hash())
+	sig, err := signer.Sign(entry.Hash())
 	if err == nil {
-		tx.Signature = sig.Bytes()
+		entry.Signature = sig.Bytes()
 	}
 
 	return err
 }
 
 // VerifySignature of the transaction
-func (tx *LogEntryBlock) VerifySignature(verifier Signator) error {
-	return verifier.Verify(tx.Header.Source, tx.Signature, tx.Hash())
+func (entry *LogEntryBlock) VerifySignature(verifier Signator) error {
+	return verifier.Verify(entry.Header.Source, entry.Signature, entry.Hash())
 }*/
 
-// MarshalJSON is a custom JSON marshaller.  It properly formats the hashes
-// and includes everything except the transaction data.
-func (tx *LogEntryBlock) MarshalJSON() ([]byte, error) {
+func (entry LogEntryBlock) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
-		"Prev":      hex.EncodeToString(tx.Header.PrevHash),
-		"Id":        hex.EncodeToString(tx.ID()),
-		"Key":       string(tx.Key),
-		"Timestamp": tx.Header.Timestamp,
-		"Height":    tx.Header.Height,
+		"Id":     hex.EncodeToString(entry.ID()),
+		"Key":    string(entry.Key),
+		"Header": entry.Header,
 	})
 }
 
-func (tx *LogEntryBlock) UnmarshalBinary(b []byte) error {
+func (entry *LogEntryBlock) UnmarshalBinary(b []byte) error {
 	if len(b) < 10 {
 		return errInvalidData
 	}
 
 	keySize := binary.BigEndian.Uint16(b[:2])
 	ei := 2 + uint64(keySize)
-	tx.Key = b[2:ei]
+	entry.Key = b[2:ei]
 
 	headerSize := binary.BigEndian.Uint16(b[ei : ei+2])
 	ei += 2
@@ -164,37 +169,37 @@ func (tx *LogEntryBlock) UnmarshalBinary(b []byte) error {
 	if err := hdr.UnmarshalBinary(b[ei : ei+uint64(headerSize)]); err != nil {
 		return err
 	}
-	tx.Header = hdr
+	entry.Header = hdr
 	ei += uint64(headerSize)
 
 	dataSize := binary.BigEndian.Uint32(b[ei : ei+4])
 	ei += 4
-	tx.Data = b[ei : ei+uint64(dataSize)]
+	entry.Data = b[ei : ei+uint64(dataSize)]
 	ei += uint64(dataSize)
 
 	sigSize := binary.BigEndian.Uint16(b[ei : ei+2])
 	ei += 2
-	tx.Signature = b[ei : ei+uint64(sigSize)]
+	entry.Signature = b[ei : ei+uint64(sigSize)]
 	//ei += uint64(sigSize)
 
 	return nil
 }
 
-func (tx *LogEntryBlock) MarshalBinary() ([]byte, error) {
+func (entry *LogEntryBlock) MarshalBinary() ([]byte, error) {
 	ksize := make([]byte, 2)
-	binary.BigEndian.PutUint16(ksize, uint16(len(tx.Key)))
+	binary.BigEndian.PutUint16(ksize, uint16(len(entry.Key)))
 
-	headerBytes, _ := tx.Header.MarshalBinary()
+	headerBytes, _ := entry.Header.MarshalBinary()
 	hsize := make([]byte, 2)
 	binary.BigEndian.PutUint16(hsize, uint16(len(headerBytes)))
 
 	dsize := make([]byte, 4)
-	binary.BigEndian.PutUint32(dsize, uint32(len(tx.Data)))
+	binary.BigEndian.PutUint32(dsize, uint32(len(entry.Data)))
 
 	ssize := make([]byte, 2)
-	binary.BigEndian.PutUint16(ssize, uint16(len(tx.Signature)))
+	binary.BigEndian.PutUint16(ssize, uint16(len(entry.Signature)))
 
-	return utils.ConcatByteSlices(ksize, tx.Key, hsize, headerBytes, dsize, tx.Data, ssize, tx.Signature), nil
+	return utils.ConcatByteSlices(ksize, entry.Key, hsize, headerBytes, dsize, entry.Data, ssize, entry.Signature), nil
 }
 
 // NewLogBlock instantiates a new empty Block.
@@ -204,6 +209,18 @@ func NewLogBlock(key []byte) *LogBlock {
 		Root: make([]byte, 32),
 		TXs:  make([][]byte, 0),
 	}
+}
+
+func (t *LogBlock) EncodeBlock() (*Block, error) {
+	d, _ := t.MarshalBinary()
+	return &Block{Type: BlockType_LOG, Data: d}, nil
+}
+
+func (t *LogBlock) DecodeBlock(blk *Block) error {
+	if blk.Type != BlockType_LOG {
+		return ErrInvalidBlockType
+	}
+	return t.UnmarshalBinary(blk.Data)
 }
 
 // MarshalBinary marshals the block into a byte slice.
@@ -255,10 +272,15 @@ func (t *LogBlock) ContainsEntry(h []byte) bool {
 
 // AppendEntry appends a transaction id to the block and re-calculates the merkle root if it is not found.
 // If the tx id already exists it simply returns
-func (t *LogBlock) AppendEntry(tx *LogEntryBlock) error {
-	id := tx.ID()
+func (t *LogBlock) AppendEntry(entry *LogEntryBlock) error {
+	id := entry.ID()
+	// return if we already have it.
+	if t.ContainsEntry(id) {
+		return nil
+	}
+	// check previous hash
 	if len(t.TXs) > 0 {
-		if !utils.EqualBytes(t.TXs[len(t.TXs)-1], tx.Header.PrevHash) {
+		if !utils.EqualBytes(t.TXs[len(t.TXs)-1], entry.Header.PrevHash) {
 			return ErrPrevHash
 		}
 	}

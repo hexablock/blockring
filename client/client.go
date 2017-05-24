@@ -38,7 +38,7 @@ type Client struct {
 	conf   *Config
 	locate *blockring.LookupServiceClient
 	rs     *blockring.BlockRing
-	lr     *blockring.LogRing
+	//lr     *blockring.LogRing
 }
 
 // NewClient instantiates a new client
@@ -63,10 +63,8 @@ func NewClient(conf *Config) (*Client, error) {
 	}
 
 	blkTrans := blockring.NewBlockNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	c.rs = blockring.NewBlockRing(c, blkTrans, nil)
-
 	logTrans := blockring.NewLogNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	c.lr = blockring.NewLogRing(c, logTrans, nil)
+	c.rs = blockring.NewBlockRing(c, blkTrans, logTrans, nil)
 
 	return c, nil
 }
@@ -95,10 +93,13 @@ func (client *Client) LocateReplicatedKey(key []byte, r int) ([]*structs.Locatio
 }
 
 func (client *Client) NewEntry(key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
-	return client.lr.NewEntry(key, opts)
+	return client.rs.NewEntry(key, opts)
 }
 func (client *Client) ProposeEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
-	return client.lr.ProposeEntry(tx, opts)
+	return client.rs.ProposeEntry(tx, opts)
+}
+func (client *Client) GetLogBlock(key []byte, opts structs.RequestOptions) (*structs.Location, *structs.LogBlock, error) {
+	return client.rs.GetLogBlock(key, opts)
 }
 
 // SetBlock sets the given block on the ring with the configured replication factor

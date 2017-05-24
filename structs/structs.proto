@@ -5,10 +5,10 @@ package structs;
 import "github.com/ipkg/go-chord/net.proto";
 
 enum BlockType {
-    ROOTBLOCK = 0;
-    DATABLOCK = 1;
-    LOGBLOCK = 2;
-    LOGENTRYBLOCK = 3;
+    ROOT = 0;
+    DATA = 1;
+    LOG = 2;
+    LOGENTRY = 3;
 }
 
 message Block {

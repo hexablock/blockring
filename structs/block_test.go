@@ -21,7 +21,7 @@ func TestBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if b2.Type != BlockType_DATABLOCK {
+	if b2.Type != BlockType_DATA {
 		t.Fatalf("wrong block type have=%s", b2.Type)
 	}
 }
@@ -30,7 +30,7 @@ func TestRootBlock(t *testing.T) {
 	ib := NewRootBlock()
 
 	for i := uint64(0); i < 3; i++ {
-		b := &Block{Type: BlockType_DATABLOCK, Data: []byte(fmt.Sprintf("1234567%d", i))}
+		b := &Block{Type: BlockType_DATA, Data: []byte(fmt.Sprintf("1234567%d", i))}
 		ib.AddBlock(i+1, b)
 	}
 

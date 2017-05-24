@@ -41,7 +41,7 @@ func (idx *RootBlock) Len() int {
 
 func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
-		"Type":      BlockType_ROOTBLOCK,
+		"Type":      BlockType_ROOT,
 		"Size":      idx.sz,
 		"BlockSize": idx.bs,
 	}
@@ -100,7 +100,7 @@ func (idx *RootBlock) EncodeBlock() *Block {
 
 	bids := utils.ConcatByteSlices(a...)
 
-	blk := &Block{Type: BlockType_ROOTBLOCK}
+	blk := &Block{Type: BlockType_ROOT}
 	// size
 	sb := make([]byte, 8)
 	binary.BigEndian.PutUint64(sb, idx.sz)
@@ -114,7 +114,7 @@ func (idx *RootBlock) EncodeBlock() *Block {
 
 // DecodeBlock decodes block data into a RootBlock
 func (idx *RootBlock) DecodeBlock(block *Block) error {
-	if block.Type != BlockType_ROOTBLOCK {
+	if block.Type != BlockType_ROOT {
 		return ErrInvalidBlockType
 	}
 	if len(block.Data) < 12 {

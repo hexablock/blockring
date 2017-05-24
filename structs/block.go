@@ -13,7 +13,7 @@ var (
 )
 
 func NewDataBlock(data []byte) *Block {
-	return &Block{Type: BlockType_DATABLOCK, Data: data}
+	return &Block{Type: BlockType_DATA, Data: data}
 }
 
 func (blk *Block) MarshalBinary() ([]byte, error) {
@@ -55,7 +55,7 @@ func (blk *Block) ID() []byte {
 // an INDEXBLOCK
 func (blk *Block) Size() uint64 {
 	switch blk.Type {
-	case BlockType_ROOTBLOCK:
+	case BlockType_ROOT:
 		if len(blk.Data) < 8 {
 			return 0
 		}

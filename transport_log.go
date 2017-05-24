@@ -58,20 +58,20 @@ func (c *LogNetTransportClient) NewEntry(loc *structs.Location, key []byte, opts
 	return nil, resp.Location, err
 }
 
-func (c *LogNetTransportClient) GetEntry(loc *structs.Location, hash []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
+func (c *LogNetTransportClient) GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	req := &rpc.BlockRPCData{ID: hash, Options: &opts}
-	resp, err := conn.LogRPC.GetEntryRPC(context.Background(), req)
+	req := &rpc.BlockRPCData{ID: key, Options: &opts}
+	resp, err := conn.LogRPC.GetLogBlockRPC(context.Background(), req)
 	c.out.Return(conn)
 
 	if err == nil {
-		var l structs.LogEntryBlock
-		if err = l.DecodeBlock(resp.Block); err == nil {
-			return &l, resp.Location, nil
+		var lb structs.LogBlock
+		if err = lb.DecodeBlock(resp.Block); err == nil {
+			return &lb, resp.Location, nil
 		}
 	}
 
@@ -102,13 +102,25 @@ func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.L
 type LogNetTransport struct {
 	host string
 	txl  *hexalog.HexaLog
+	bs   hexalog.BlockStore
 }
 
-func NewLogNetTransport(host string, txl *hexalog.HexaLog) *LogNetTransport {
+func NewLogNetTransport(host string, txl *hexalog.HexaLog, bs hexalog.BlockStore) *LogNetTransport {
 	return &LogNetTransport{
 		txl:  txl,
+		bs:   bs,
 		host: host,
 	}
+}
+
+func (t *LogNetTransport) GetLogBlockRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
+	resp := &rpc.BlockRPCData{}
+
+	blk, err := t.bs.Get(req.ID)
+	if err == nil {
+		resp.Block, err = blk.EncodeBlock()
+	}
+	return resp, err
 }
 
 func (t *LogNetTransport) NewEntryRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
@@ -119,17 +131,6 @@ func (t *LogNetTransport) NewEntryRPC(ctx context.Context, req *rpc.BlockRPCData
 			return &rpc.BlockRPCData{Block: blk}, nil
 		}
 
-	}
-	return &rpc.BlockRPCData{}, err
-}
-
-func (t *LogNetTransport) GetEntryRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
-	tx, loc, err := t.txl.GetEntry(req.ID)
-	if err == nil {
-		var blk *structs.Block
-		if blk, err = tx.EncodeBlock(); err == nil {
-			return &rpc.BlockRPCData{Block: blk, Location: loc}, nil
-		}
 	}
 	return &rpc.BlockRPCData{}, err
 }
@@ -160,6 +161,7 @@ func (t *LogNetTransport) CommitEntryRPC(ctx context.Context, req *rpc.BlockRPCD
 type LogRingTransport struct {
 	host   string
 	txl    *hexalog.HexaLog
+	bs     hexalog.BlockStore
 	remote LogTransport
 }
 
@@ -168,6 +170,14 @@ func NewLogRingTransport(host string, txl *hexalog.HexaLog, remote LogTransport)
 		return &LogRingTransport{host: host, remote: NewLogNetTransportClient(30, 180), txl: txl}
 	}
 	return &LogRingTransport{host: host, remote: remote, txl: txl}
+}
+
+func (lt *LogRingTransport) GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error) {
+	if lt.host == loc.Vnode.Host {
+		lb, err := lt.bs.Get(key)
+		return lb, &structs.Location{}, err
+	}
+	return lt.remote.GetLogBlock(loc, key, opts)
 }
 
 func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
@@ -183,13 +193,6 @@ func (lt *LogRingTransport) NewEntry(loc *structs.Location, key []byte, opts str
 		return tx, &structs.Location{}, err
 	}
 	return lt.remote.NewEntry(loc, key, opts)
-}
-
-func (lt *LogRingTransport) GetEntry(loc *structs.Location, id []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
-	if lt.host == loc.Vnode.Host {
-		return lt.txl.GetEntry(id)
-	}
-	return lt.remote.GetEntry(loc, id, opts)
 }
 
 func (lt *LogRingTransport) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {

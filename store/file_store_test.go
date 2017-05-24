@@ -24,7 +24,7 @@ func TestFileBlockStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if gblk.Type != structs.BlockType_DATABLOCK {
+	if gblk.Type != structs.BlockType_DATA {
 		t.Fatal("wrong block type")
 	}
 
@@ -32,7 +32,7 @@ func TestFileBlockStore(t *testing.T) {
 		t.Fatal("wrong size")
 	}
 	c := 0
-	fbs.IterBlocks(func(block *structs.Block) error {
+	fbs.IterBlockIDs(func(id []byte) error {
 		c++
 		return nil
 	})

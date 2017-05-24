@@ -23,9 +23,9 @@ service LocateRPC {
 
 service LogRPC {
     rpc NewEntryRPC(BlockRPCData) returns (BlockRPCData) {}
-    rpc GetEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc ProposeEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc CommitEntryRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc GetLogBlockRPC(BlockRPCData) returns (BlockRPCData) {}
 }
 
 message BlockRPCData{
