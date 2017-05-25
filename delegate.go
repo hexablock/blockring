@@ -2,7 +2,8 @@ package blockring
 
 import (
 	"bytes"
-	"log"
+
+	"github.com/hexablock/log"
 
 	chord "github.com/ipkg/go-chord"
 
@@ -49,17 +50,17 @@ func (s *ChordDelegate) takeoverBlock(id []byte, loc *structs.Location) {
 	// get the block from the ring.
 	_, blk, err := s.blockRing.GetBlock(id)
 	if err != nil {
-		log.Printf("ERR action=takeover phase=failed block/%x  msg='Failed to get block: %v'", id, err)
+		log.Printf("[ERROR] action=takeover phase=failed block/%x  msg='Failed to get block: %v'", id, err)
 	}
 
 	log.Printf("DBG action=takeover phase=begin block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
 
 	// try to set block
 	if err = s.Store.SetBlock(loc, blk); err != nil {
-		log.Printf("ERR action=takeover phase=failed block/%x dst=%s msg='%v'",
+		log.Printf("[ERROR] action=takeover phase=failed block/%x dst=%s msg='%v'",
 			id, utils.ShortVnodeID(loc.Vnode), err)
 	} else {
-		log.Printf("DBG action=takeover phase=complete block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
+		log.Printf("[DEBUG] action=takeover phase=complete block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
 	}
 }
 
@@ -71,7 +72,7 @@ func (s *ChordDelegate) startConsuming() {
 
 		_, vn, err := s.ring.LookupHash(id, 1)
 		if err != nil {
-			log.Println("ERR", err)
+			log.Println("[ERROR]", err)
 			continue
 		}
 
@@ -80,13 +81,13 @@ func (s *ChordDelegate) startConsuming() {
 			s.takeoverBlock(id, b.Location)
 		} else {
 			// re-route
-			log.Printf("DBG action=route phase=begin block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
+			log.Printf("[DEBUG] action=route phase=begin block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
 
 			loc := &structs.Location{Id: id, Vnode: vn[0]}
 			if err = s.Store.remote.TransferBlock(loc, id); err != nil {
-				log.Printf("ERR action=route phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(vn[0]), err)
+				log.Printf("[ERROR] action=route phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(vn[0]), err)
 			} else {
-				log.Printf("DBG action=route phase=complete block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
+				log.Printf("[DEBUG] action=route phase=complete block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
 			}
 		}
 
@@ -105,11 +106,11 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 		}
 
 		loc := &structs.Location{Id: id, Vnode: remote}
-		log.Printf("DBG action=transfer phase=begin block/%x dst=%s", id, utils.ShortVnodeID(remote))
+		log.Printf("[DEBUG] action=transfer phase=begin block/%x dst=%s", id, utils.ShortVnodeID(remote))
 		if err := s.Store.remote.TransferBlock(loc, id); err != nil {
-			log.Printf("ERR action=transfer phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(remote), err)
+			log.Printf("[ERROR] action=transfer phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(remote), err)
 		} else {
-			log.Printf("DBG action=transfer phase=complete block/%x dst=%s", id, utils.ShortVnodeID(remote))
+			log.Printf("[DEBUG] action=transfer phase=complete block/%x dst=%s", id, utils.ShortVnodeID(remote))
 		}
 
 		//
@@ -122,7 +123,7 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 
 // NewPredecessor is called when a new predecessor is found
 func (s *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnode) {
-	log.Printf("INF event=predecessor pred=%s local=%s", utils.ShortVnodeID(remoteNew), utils.ShortVnodeID(local))
+	log.Printf("[INFO] event=predecessor pred=%s local=%s", utils.ShortVnodeID(remoteNew), utils.ShortVnodeID(local))
 	// nothing to do if new predecessor is local.
 	if local.Host == remoteNew.Host {
 		return
@@ -131,7 +132,7 @@ func (s *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnode
 	s.peerStore.AddPeer(remoteNew.Host)
 
 	if err := s.transferBlocks(local, remoteNew); err != nil {
-		log.Printf("ERR action=transfer-blocks local=%s remote=%s", utils.ShortVnodeID(local), utils.ShortVnodeID(remoteNew))
+		log.Printf("[ERROR] action=transfer-blocks local=%s remote=%s", utils.ShortVnodeID(local), utils.ShortVnodeID(remoteNew))
 	}
 
 }
@@ -153,5 +154,5 @@ func (s *ChordDelegate) SuccessorLeaving(local, remote *chord.Vnode) {
 
 // Shutdown is called when the node is shutting down
 func (s *ChordDelegate) Shutdown() {
-	log.Println("INF event=shutdown")
+	log.Println("[INFO] event=shutdown")
 }

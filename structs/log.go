@@ -151,6 +151,7 @@ func (entry LogEntryBlock) MarshalJSON() ([]byte, error) {
 		"Id":     hex.EncodeToString(entry.ID()),
 		"Key":    string(entry.Key),
 		"Header": entry.Header,
+		"Data":   entry.Data,
 	})
 }
 

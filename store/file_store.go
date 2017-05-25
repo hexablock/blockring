@@ -4,11 +4,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/hexablock/log"
 
 	"github.com/hexablock/blockring/structs"
 )
@@ -57,7 +58,7 @@ func (st *FileBlockStore) flushBlocks() {
 		st.mu.Lock()
 		for k, v := range st.buf {
 			if err := st.writeBlockToFile(v); err != nil {
-				log.Println("ERR", err)
+				log.Println("[ERROR]", err)
 				continue
 			}
 			delete(st.buf, k)

@@ -38,7 +38,6 @@ type Client struct {
 	conf   *Config
 	locate *blockring.LookupServiceClient
 	rs     *blockring.BlockRing
-	//lr     *blockring.LogRing
 }
 
 // NewClient instantiates a new client

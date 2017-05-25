@@ -162,7 +162,6 @@ func (br *BlockRing) GetLogBlock(key []byte, opts ...structs.RequestOptions) (*s
 		if blk == nil {
 			err = errors.New("not found")
 		}
-
 	}
 
 	return loc, blk, err
@@ -182,13 +181,23 @@ func (br *BlockRing) GetEntry(id []byte, opts structs.RequestOptions) (*structs.
 
 // NewEntry gets a new entry from the log.
 func (br *BlockRing) NewEntry(key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
-	keyHash, _, succs, err := br.locator.LookupKey(key, int(opts.PeerSetSize))
+
+	locs, err := br.locator.LocateReplicatedKey(key, int(opts.PeerSetSize))
 	if err != nil {
 		return nil, nil, err
 	}
-	loc := &structs.Location{Id: keyHash, Vnode: succs[0], Priority: 0}
-	blk, _, err := br.logTrans.NewEntry(loc, key, opts)
-	return blk, loc, err
+
+	// Return the first good entry from a location
+	var l *structs.Location
+	for _, loc := range locs {
+		var blk *structs.LogEntryBlock
+		if blk, _, err = br.logTrans.NewEntry(loc, key, opts); err == nil {
+			return blk, loc, nil
+		}
+		l = loc
+	}
+	// Return error and associated location of err
+	return nil, l, err
 }
 
 // ProposeEntry proposes a transaction to the network.
@@ -221,6 +230,7 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 							Destination: loc.Vnode.Id,
 							Source:      opts.Source,
 							PeerSetSize: opts.PeerSetSize,
+							PeerSetKey:  loc.Id,
 						}
 						if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 							errCh <- er
@@ -245,6 +255,7 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 						Destination: loc.Vnode.Id,
 						Source:      loc.Vnode.Id,
 						PeerSetSize: opts.PeerSetSize,
+						PeerSetKey:  loc.Id,
 					}
 					if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 						errCh <- er
@@ -273,6 +284,7 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 	return meta, err
 }
 
+// CommitEntry tries to commit an entry
 func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	locs, err := br.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
@@ -290,6 +302,7 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 			}
 
 			opts.Destination = loc.Vnode.Id
+			opts.PeerSetKey = loc.Id
 			//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
 			if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
 				err = er
@@ -302,6 +315,7 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 		for _, loc := range locs {
 			opts.Source = loc.Vnode.Id
 			opts.Destination = loc.Vnode.Id
+			opts.PeerSetKey = loc.Id
 			//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
 			if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
 				err = er

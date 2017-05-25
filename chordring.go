@@ -3,8 +3,9 @@ package blockring
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/hexablock/log"
 
 	"github.com/hexablock/blockring/store"
 	"github.com/hexablock/blockring/structs"

@@ -75,7 +75,7 @@ func (c *LogNetTransportClient) GetLogBlock(loc *structs.Location, key []byte, o
 		}
 	}
 
-	return nil, resp.Location, err
+	return nil, nil, err
 }
 
 func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
