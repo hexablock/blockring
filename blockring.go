@@ -1,7 +1,6 @@
 package blockring
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -107,7 +106,7 @@ func (br *BlockRing) GetBlock(id []byte, opts ...structs.RequestOptions) (*struc
 
 	if err == nil {
 		if blk == nil {
-			err = errors.New("not found")
+			err = utils.ErrNotFound
 		}
 
 		/*if br.proxShiftEnabled {
@@ -155,7 +154,7 @@ func (br *BlockRing) GetLogBlock(key []byte, opts structs.RequestOptions) (*stru
 
 	if err == nil {
 		if blk == nil {
-			err = errors.New("not found")
+			err = utils.ErrNotFound
 		}
 	}
 

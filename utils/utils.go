@@ -16,6 +16,8 @@ var keyspaceSize = new(big.Int).SetBytes([]byte{
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 })
 
+var ErrNotFound = errors.New("not found")
+
 // ReplicatedKeyHashes calculates all hashes for a replicated key.  It uses  the method mentioned in
 // this paper: https://arxiv.org/pdf/1006.3465.pdf
 func ReplicatedKeyHashes(key []byte, r int) [][]byte {

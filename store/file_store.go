@@ -12,6 +12,7 @@ import (
 	"github.com/hexablock/log"
 
 	"github.com/hexablock/blockring/structs"
+	"github.com/hexablock/blockring/utils"
 )
 
 type FileBlockStore struct {
@@ -164,7 +165,7 @@ func (st *FileBlockStore) ReleaseBlock(id []byte) error {
 	ap := st.abspath(sid)
 
 	if _, err := os.Stat(ap); err != nil {
-		return errNotFound
+		return utils.ErrNotFound
 	}
 
 	//log.Printf("Releasing block/%x path='%s'", id, ap)

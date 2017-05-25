@@ -5,10 +5,7 @@ import (
 	"sync"
 
 	"github.com/hexablock/blockring/structs"
-)
-
-var (
-	errNotFound = errors.New("not found")
+	"github.com/hexablock/blockring/utils"
 )
 
 // BlockStore implements a block storage interface
@@ -44,7 +41,7 @@ func (mem *MemBlockStore) ReleaseBlock(id []byte) error {
 	}
 	mem.mu.RUnlock()
 
-	return errNotFound
+	return utils.ErrNotFound
 }
 
 // GetBlock returns a block with the given id if it exists
@@ -56,7 +53,7 @@ func (mem *MemBlockStore) GetBlock(id []byte) (*structs.Block, error) {
 		return v, nil
 	}
 	mem.mu.RUnlock()
-	return nil, errNotFound
+	return nil, utils.ErrNotFound
 }
 
 // IterBlocks iterates over blocks in theh store.  If an error is returned by the callback
