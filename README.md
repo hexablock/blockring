@@ -8,8 +8,11 @@ There are 2 main data categories.  This determines how data is written to the ri
 - Mutable
 
 ### Immutable
+Immutable data does not go through the consensus process and is directly written.  Data blocks are written
+in this manner.
 
 ### Mutable
+Mutable data goes through the consensus process i.e. the log.
 
 ### Roadmap
 

@@ -291,38 +291,68 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 		return nil, err
 	}
 
-	// TODO: call concurrently
+	var (
+		wg    sync.WaitGroup
+		errCh = make(chan error, len(locs))
+		done  = make(chan struct{})
+		bail  int32
+		meta  *structs.Location
+	)
 
-	var meta *structs.Location
+	wg.Add(len(locs))
+
 	if opts.Source != nil && len(opts.Source) > 0 {
 		// Broadcast to all vnodes skipping the source.
-		for _, loc := range locs {
-			if utils.EqualBytes(loc.Vnode.Id, opts.Source) {
-				continue
-			}
+		for _, l := range locs {
 
-			opts.Destination = loc.Vnode.Id
-			opts.PeerSetKey = loc.Id
-			//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
-			if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
-				err = er
-				break
-			}
+			go func(loc *structs.Location) {
+				if atomic.LoadInt32(&bail) == 0 {
+
+					if !utils.EqualBytes(loc.Vnode.Id, opts.Source) {
+
+						opts.Destination = loc.Vnode.Id
+						opts.PeerSetKey = loc.Id
+						if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
+							errCh <- er
+						}
+					}
+				}
+				wg.Done()
+			}(l)
+
 		}
 
 	} else {
 		// Broadcast to all vnodes
-		for _, loc := range locs {
-			opts.Source = loc.Vnode.Id
-			opts.Destination = loc.Vnode.Id
-			opts.PeerSetKey = loc.Id
-			//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
-			if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
-				err = er
-				break
-			}
+		for _, l := range locs {
+
+			go func(loc *structs.Location) {
+				if atomic.LoadInt32(&bail) == 0 {
+
+					opts.Source = loc.Vnode.Id
+					opts.Destination = loc.Vnode.Id
+					opts.PeerSetKey = loc.Id
+					//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
+					if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
+						errCh <- er
+					}
+
+				}
+				wg.Done()
+			}(l)
 		}
 
+	}
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case err = <-errCh:
+		atomic.StoreInt32(&bail, 1)
 	}
 
 	return meta, err
