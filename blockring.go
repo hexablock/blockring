@@ -137,20 +137,15 @@ func (br *BlockRing) GetRootBlock(id []byte, opts ...structs.RequestOptions) (*s
 }
 
 // GetLogBlock gets the LogBlock by routing the key until it is found.
-func (br *BlockRing) GetLogBlock(key []byte, opts ...structs.RequestOptions) (*structs.Location, *structs.LogBlock, error) {
-
-	o := *structs.DefaultRequestOptions()
-	if len(opts) > 0 {
-		o = opts[0]
-	}
+func (br *BlockRing) GetLogBlock(key []byte, opts structs.RequestOptions) (*structs.Location, *structs.LogBlock, error) {
 
 	var (
 		blk *structs.LogBlock
 		loc *structs.Location
 	)
 
-	err := br.locator.RouteKey(key, int(o.PeerSetSize), func(l *structs.Location) bool {
-		if b, _, err := br.logTrans.GetLogBlock(l, key, o); err == nil {
+	err := br.locator.RouteKey(key, int(opts.PeerSetSize), func(l *structs.Location) bool {
+		if b, _, err := br.logTrans.GetLogBlock(l, key, opts); err == nil {
 			blk = b
 			loc = l
 			return false
