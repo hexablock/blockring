@@ -35,10 +35,6 @@ func NewFileBlockStore(datadir string) *FileBlockStore {
 	return fbs
 }
 
-func (st *FileBlockStore) abspath(p string) string {
-	return filepath.Join(st.datadir, p)
-}
-
 // GetBlock returns a block with the given id if it exists
 func (st *FileBlockStore) GetBlock(id []byte) (*structs.Block, error) {
 	st.mu.RLock()
@@ -52,23 +48,7 @@ func (st *FileBlockStore) GetBlock(id []byte) (*structs.Block, error) {
 	return st.readBlockFromFile(ap)
 }
 
-func (st *FileBlockStore) flushBlocks() {
-	for {
-		time.Sleep(st.flushInterval)
-		// write all in-mem blocks to disk removing from in-mem on success
-		st.mu.Lock()
-		for k, v := range st.buf {
-			if err := st.writeBlockToFile(v); err != nil {
-				log.Println("[ERROR]", err)
-				continue
-			}
-			delete(st.buf, k)
-		}
-		st.mu.Unlock()
-	}
-}
-
-func (st *FileBlockStore) IterBlockIDs(f func(id []byte) error) error {
+func (st *FileBlockStore) IterIDs(f func(id []byte) error) error {
 	i := 0
 	st.mu.RLock()
 	inMem := make([][]byte, len(st.buf))
@@ -108,9 +88,9 @@ func (st *FileBlockStore) IterBlockIDs(f func(id []byte) error) error {
 	return err
 }
 
-// IterBlocks iterates over blocks in theh store.  If an error is returned by the callback
+// Iter iterates over blocks in theh store.  If an error is returned by the callback
 // iteration is immediately terminated returning the error.
-func (st *FileBlockStore) IterBlocks(f func(block *structs.Block) error) error {
+func (st *FileBlockStore) Iter(f func(block *structs.Block) error) error {
 	// read in-mem blocks
 	st.mu.RLock()
 	for _, v := range st.buf {
@@ -171,6 +151,26 @@ func (st *FileBlockStore) ReleaseBlock(id []byte) error {
 	//log.Printf("Releasing block/%x path='%s'", id, ap)
 
 	return errors.New("TBI")
+}
+
+func (st *FileBlockStore) abspath(p string) string {
+	return filepath.Join(st.datadir, p)
+}
+
+func (st *FileBlockStore) flushBlocks() {
+	for {
+		time.Sleep(st.flushInterval)
+		// write all in-mem blocks to disk removing from in-mem on success
+		st.mu.Lock()
+		for k, v := range st.buf {
+			if err := st.writeBlockToFile(v); err != nil {
+				log.Println("[ERROR]", err)
+				continue
+			}
+			delete(st.buf, k)
+		}
+		st.mu.Unlock()
+	}
 }
 
 func (st *FileBlockStore) writeBlockToFile(blk *structs.Block) error {

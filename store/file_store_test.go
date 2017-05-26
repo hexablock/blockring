@@ -32,7 +32,7 @@ func TestFileBlockStore(t *testing.T) {
 		t.Fatal("wrong size")
 	}
 	c := 0
-	fbs.IterBlockIDs(func(id []byte) error {
+	fbs.IterIDs(func(id []byte) error {
 		c++
 		return nil
 	})

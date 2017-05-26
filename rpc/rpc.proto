@@ -26,6 +26,8 @@ service LogRPC {
     rpc ProposeEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc CommitEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc GetLogBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc TransferLogBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc ReleaseLogBlockRPC(BlockRPCData) returns (BlockRPCData) {}
 }
 
 message BlockRPCData{

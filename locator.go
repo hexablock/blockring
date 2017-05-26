@@ -1,10 +1,14 @@
 package blockring
 
 import (
+	"errors"
+
 	"github.com/hexablock/blockring/structs"
 	"github.com/ipkg/difuse/utils"
 	chord "github.com/ipkg/go-chord"
 )
+
+var errLessThanOne = errors.New("must be greater than 0")
 
 // Locator implements a location and lookup service
 type Locator interface {
@@ -22,17 +26,19 @@ type locatorRouter struct {
 // the first batch of n vnodes does not contain the block, then the next n vnodes from the last vnode of the
 // previous batch is used until a full circle has been made around the ring.
 func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location) bool) error {
-	lid := hash
+	if n < 1 {
+		return errLessThanOne
+	}
 
-	_, vns, err := rl.LookupHash(lid, n)
+	_, vns, err := rl.LookupHash(hash, n)
 	if err != nil {
 		return err
 	}
 
-	// Try the primary vnode
-	svn := vns[0]
+	lid := hash
+	svn := vns[0] //primary
 	pstart := int32(0)
-
+	// Try the primary vnode
 	loc := &structs.Location{Id: hash, Vnode: svn, Priority: pstart}
 	if !f(loc) {
 		return nil
@@ -87,6 +93,9 @@ func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location)
 }
 
 func (rl *locatorRouter) RouteKey(key []byte, n int, f func(*structs.Location) bool) error {
+	if n < 1 {
+		return errLessThanOne
+	}
 
 	keyhash, _, vns, err := rl.LookupKey(key, n)
 	if err != nil {
@@ -94,11 +103,9 @@ func (rl *locatorRouter) RouteKey(key []byte, n int, f func(*structs.Location) b
 	}
 
 	lid := keyhash
-
-	// Try the primary vnode
-	svn := vns[0]
+	svn := vns[0] // primary
 	pstart := int32(0)
-
+	// Try the primary vnode
 	loc := &structs.Location{Id: keyhash, Vnode: svn, Priority: pstart}
 	if !f(loc) {
 		return nil

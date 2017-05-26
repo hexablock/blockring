@@ -15,6 +15,7 @@ type LogTransport interface {
 	NewEntry(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error)
 	CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
 	GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error)
+	TransferLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.Location, error)
 }
 
 // BlockTransport implements the transport interface for the block store.
@@ -96,6 +97,7 @@ func (br *BlockRing) GetBlock(id []byte, opts ...structs.RequestOptions) (*struc
 	)
 
 	err := br.locator.RouteHash(id, int(o.PeerSetSize), func(l *structs.Location) bool {
+
 		if b, err := br.blkTrans.GetBlock(l, id); err == nil {
 			blk = b
 			loc = l

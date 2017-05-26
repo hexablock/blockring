@@ -3,6 +3,7 @@ package blockring
 import (
 	"bytes"
 
+	"github.com/btcsuite/fastsha256"
 	"github.com/hexablock/log"
 
 	chord "github.com/ipkg/go-chord"
@@ -14,7 +15,8 @@ import (
 )
 
 type ChordDelegate struct {
-	Store *BlockRingTransport
+	Store    *BlockRingTransport
+	LogTrans *LogRingTransport
 
 	ring      *ChordRing
 	blockRing *BlockRing
@@ -41,6 +43,18 @@ func (s *ChordDelegate) Register(ring *ChordRing, blockRing *BlockRing) {
 	go s.startConsuming()
 }
 
+func (s *ChordDelegate) takeoverLogBlock(key []byte, loc *structs.Location) {
+	// get block from network
+	opts := structs.RequestOptions{PeerSetKey: loc.Id, PeerSetSize: int32(s.ring.NumSuccessors())}
+	blk, _, err := s.LogTrans.GetLogBlock(loc, key, opts)
+	if err != nil {
+		log.Printf("[ERROR] action=takeover phase=failed key/%s  msg='Failed to get log block: %v'", key, err)
+		return
+	}
+
+	s.LogTrans.txl.Replay(blk)
+}
+
 func (s *ChordDelegate) takeoverBlock(id []byte, loc *structs.Location) {
 	// skip if we have the block
 	if _, err := s.Store.local.GetBlock(id); err == nil {
@@ -51,11 +65,10 @@ func (s *ChordDelegate) takeoverBlock(id []byte, loc *structs.Location) {
 	_, blk, err := s.blockRing.GetBlock(id)
 	if err != nil {
 		log.Printf("[ERROR] action=takeover phase=failed block/%x  msg='Failed to get block: %v'", id, err)
+		return
 	}
 
-	log.Printf("DBG action=takeover phase=begin block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
-
-	// try to set block
+	log.Printf("[DEBUG] action=takeover phase=begin block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
 	if err = s.Store.SetBlock(loc, blk); err != nil {
 		log.Printf("[ERROR] action=takeover phase=failed block/%x dst=%s msg='%v'",
 			id, utils.ShortVnodeID(loc.Vnode), err)
@@ -64,38 +77,101 @@ func (s *ChordDelegate) takeoverBlock(id []byte, loc *structs.Location) {
 	}
 }
 
+func (s *ChordDelegate) takeoverOrRouteLogBlock(brd *rpc.BlockRPCData) error {
+	key := brd.ID
+	locs, err := s.ring.LocateReplicatedKey(key, 1)
+
+	if err != nil {
+		return err
+	}
+
+	loc := locs[0]
+	if loc.Vnode.Host == s.ring.Hostname() {
+		s.takeoverLogBlock(key, loc)
+	} else {
+		// re-route
+		log.Printf("[DEBUG] action=route phase=begin key/%s dst=%s", key, utils.ShortVnodeID(loc.Vnode))
+		if _, err = s.LogTrans.TransferLogBlock(loc, key, structs.RequestOptions{}); err != nil {
+			log.Printf("[ERROR] action=route phase=failed key/%s dst=%s msg='%v'", key, utils.ShortVnodeID(loc.Vnode), err)
+		} else {
+			log.Printf("[DEBUG] action=route phase=complete key/%s dst=%s", key, utils.ShortVnodeID(loc.Vnode))
+		}
+	}
+	return nil
+}
+
+func (s *ChordDelegate) takeoverOrRouteBlock(b *rpc.BlockRPCData) error {
+	id := b.ID
+	locs, err := s.ring.LocateReplicatedHash(id, 1)
+	if err != nil {
+		return err
+	}
+
+	loc := locs[0]
+	if loc.Vnode.Host == s.ring.Hostname() {
+		s.takeoverBlock(id, b.Location)
+	} else {
+		// re-route
+		log.Printf("[DEBUG] action=route phase=begin block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
+		if err = s.Store.remote.TransferBlock(loc, id); err != nil {
+			log.Printf("[ERROR] action=route phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(loc.Vnode), err)
+		} else {
+			log.Printf("[DEBUG] action=route phase=complete block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
+		}
+	}
+	return nil
+}
+
 // StartConsuming takes incoming blocks and adds them to the local store if they fall within the perview
 // of the host or are transferred to the predecessor.
 func (s *ChordDelegate) startConsuming() {
 	for b := range s.InBlocks {
-		id := b.ID
 
-		_, vn, err := s.ring.LookupHash(id, 1)
-		if err != nil {
-			log.Println("[ERROR]", err)
-			continue
+		var err error
+		if b.Block != nil && b.Block.Type == structs.BlockType_LOG {
+			err = s.takeoverOrRouteLogBlock(b)
+		} else {
+			err = s.takeoverOrRouteBlock(b)
 		}
 
-		// takeover block since we own it.
-		if vn[0].Host == s.ring.Hostname() {
-			s.takeoverBlock(id, b.Location)
-		} else {
-			// re-route
-			log.Printf("[DEBUG] action=route phase=begin block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
-
-			loc := &structs.Location{Id: id, Vnode: vn[0]}
-			if err = s.Store.remote.TransferBlock(loc, id); err != nil {
-				log.Printf("[ERROR] action=route phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(vn[0]), err)
-			} else {
-				log.Printf("[DEBUG] action=route phase=complete block/%x dst=%s", id, utils.ShortVnodeID(vn[0]))
-			}
+		if err != nil {
+			log.Println("[ERROR]", err)
 		}
 
 	}
 }
 
+func (s *ChordDelegate) transferLogBlocks(local, remote *chord.Vnode) error {
+	return s.LogTrans.bs.IterKeys(func(key []byte) error {
+		//
+		// Handle transferring natural keys.
+		//
+
+		sh := fastsha256.Sum256(key)
+		// skip blocks that do not belong to the new remote
+		if bytes.Compare(sh[:], remote.Id) >= 0 {
+			return nil
+		}
+
+		loc := &structs.Location{Id: sh[:], Vnode: remote}
+		log.Printf("[DEBUG] action=transfer phase=begin key=%s dst=%s", key, utils.ShortVnodeID(remote))
+		if _, err := s.LogTrans.TransferLogBlock(loc, key, structs.RequestOptions{}); err != nil {
+			log.Printf("[ERROR] action=transfer phase=failed key=%s dst=%s msg='%v'", key, utils.ShortVnodeID(remote), err)
+		} else {
+			log.Printf("[DEBUG] action=transfer phase=complete key=%s dst=%s", key, utils.ShortVnodeID(remote))
+		}
+
+		//
+		// TODO: handle replicas
+		//
+
+		return nil
+	})
+}
+
+// transfer all but LogBlocks
 func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
-	return s.Store.local.IterBlockIDs(func(id []byte) error {
+	return s.Store.local.IterIDs(func(id []byte) error {
 		//
 		// Handle transferring natural keys.
 		//
@@ -106,11 +182,11 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 		}
 
 		loc := &structs.Location{Id: id, Vnode: remote}
-		log.Printf("[DEBUG] action=transfer phase=begin block/%x dst=%s", id, utils.ShortVnodeID(remote))
+		log.Printf("[DEBUG] action=transfer phase=begin block=%x dst=%s", id, utils.ShortVnodeID(remote))
 		if err := s.Store.remote.TransferBlock(loc, id); err != nil {
-			log.Printf("[ERROR] action=transfer phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(remote), err)
+			log.Printf("[ERROR] action=transfer phase=failed block=%x dst=%s msg='%v'", id, utils.ShortVnodeID(remote), err)
 		} else {
-			log.Printf("[DEBUG] action=transfer phase=complete block/%x dst=%s", id, utils.ShortVnodeID(remote))
+			log.Printf("[DEBUG] action=transfer phase=complete block=%x dst=%s", id, utils.ShortVnodeID(remote))
 		}
 
 		//
@@ -130,6 +206,10 @@ func (s *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnode
 	}
 	// add the new peer to our list of known peers
 	s.peerStore.AddPeer(remoteNew.Host)
+
+	if err := s.transferLogBlocks(local, remoteNew); err != nil {
+		log.Printf("[ERROR] action=transfer-blocks local=%s remote=%s", utils.ShortVnodeID(local), utils.ShortVnodeID(remoteNew))
+	}
 
 	if err := s.transferBlocks(local, remoteNew); err != nil {
 		log.Printf("[ERROR] action=transfer-blocks local=%s remote=%s", utils.ShortVnodeID(local), utils.ShortVnodeID(remoteNew))

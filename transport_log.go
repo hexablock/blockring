@@ -1,6 +1,8 @@
 package blockring
 
 import (
+	"fmt"
+
 	"golang.org/x/net/context"
 
 	"github.com/hexablock/blockring/pool"
@@ -58,6 +60,7 @@ func (c *LogNetTransportClient) NewEntry(loc *structs.Location, key []byte, opts
 	return nil, resp.Location, err
 }
 
+// GetLogBlock gets a LogBlock from the provided location.
 func (c *LogNetTransportClient) GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error) {
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
@@ -76,6 +79,19 @@ func (c *LogNetTransportClient) GetLogBlock(loc *structs.Location, key []byte, o
 	}
 
 	return nil, nil, err
+}
+
+func (c *LogNetTransportClient) TransferLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.Location, error) {
+	conn, err := c.out.Get(loc.Vnode.Host)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &rpc.BlockRPCData{ID: key, Options: &opts}
+	resp, err := conn.LogRPC.TransferLogBlockRPC(context.Background(), req)
+	c.out.Return(conn)
+
+	return resp.Location, err
 }
 
 func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
@@ -100,9 +116,10 @@ func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.L
 }
 
 type LogNetTransport struct {
-	host string
-	txl  *hexalog.HexaLog
-	bs   hexalog.BlockStore
+	host        string
+	txl         *hexalog.HexaLog
+	bs          hexalog.BlockStore
+	inLogBlocks chan *rpc.BlockRPCData
 }
 
 func NewLogNetTransport(host string, txl *hexalog.HexaLog, bs hexalog.BlockStore) *LogNetTransport {
@@ -113,6 +130,11 @@ func NewLogNetTransport(host string, txl *hexalog.HexaLog, bs hexalog.BlockStore
 	}
 }
 
+// Register registers a channel where incoming blocks are sent for processing.
+func (t *LogNetTransport) Register(ch chan *rpc.BlockRPCData) {
+	t.inLogBlocks = ch
+}
+
 func (t *LogNetTransport) GetLogBlockRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
 	resp := &rpc.BlockRPCData{}
 
@@ -121,6 +143,27 @@ func (t *LogNetTransport) GetLogBlockRPC(ctx context.Context, req *rpc.BlockRPCD
 		resp.Block, err = blk.EncodeBlock()
 	}
 	return resp, err
+}
+
+// TransferLogBlockRPC submits a LogBlock transfer request to the input block channel.
+func (t *LogNetTransport) TransferLogBlockRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
+	resp := &rpc.BlockRPCData{}
+
+	req.Block = &structs.Block{Type: structs.BlockType_LOG}
+	t.inLogBlocks <- req
+
+	return resp, nil
+}
+
+func (t *LogNetTransport) ReleaseLogBlockRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
+	resp := &rpc.BlockRPCData{}
+	//
+	// blk, err := t.bs.Get(req.ID)
+	// if err == nil {
+	// 	resp.Block, err = blk.EncodeBlock()
+	// }
+	// return resp, err
+	return resp, fmt.Errorf("TBI")
 }
 
 func (t *LogNetTransport) NewEntryRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
@@ -165,11 +208,11 @@ type LogRingTransport struct {
 	remote LogTransport
 }
 
-func NewLogRingTransport(host string, txl *hexalog.HexaLog, remote LogTransport) *LogRingTransport {
+func NewLogRingTransport(host string, txl *hexalog.HexaLog, bs hexalog.BlockStore, remote LogTransport) *LogRingTransport {
 	if remote == nil {
-		return &LogRingTransport{host: host, remote: NewLogNetTransportClient(30, 180), txl: txl}
+		return &LogRingTransport{host: host, remote: NewLogNetTransportClient(30, 180), txl: txl, bs: bs}
 	}
-	return &LogRingTransport{host: host, remote: remote, txl: txl}
+	return &LogRingTransport{host: host, remote: remote, txl: txl, bs: bs}
 }
 
 func (lt *LogRingTransport) GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error) {
@@ -178,6 +221,13 @@ func (lt *LogRingTransport) GetLogBlock(loc *structs.Location, key []byte, opts 
 		return lb, &structs.Location{}, err
 	}
 	return lt.remote.GetLogBlock(loc, key, opts)
+}
+
+func (lt *LogRingTransport) TransferLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.Location, error) {
+	if lt.host == loc.Vnode.Host {
+		return nil, errNoLocalTransfer
+	}
+	return lt.remote.TransferLogBlock(loc, key, opts)
 }
 
 func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {

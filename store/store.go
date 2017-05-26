@@ -14,10 +14,10 @@ type BlockStore interface {
 	SetBlock(block *structs.Block) error
 	// Marks a block to be released from the store.
 	ReleaseBlock(id []byte) error
-	// Iterate over all blocks
-	IterBlocks(f func(block *structs.Block) error) error
-	// Iteraters over all blocks in the store
-	IterBlockIDs(f func([]byte) error) error
+	// Iterate over all blocks in the store
+	Iter(f func(block *structs.Block) error) error
+	// Iteraters over all block id's in the store
+	IterIDs(f func(id []byte) error) error
 }
 
 // MemBlockStore is an in-memory block store.
@@ -56,9 +56,9 @@ func (mem *MemBlockStore) GetBlock(id []byte) (*structs.Block, error) {
 	return nil, utils.ErrNotFound
 }
 
-// IterBlocks iterates over blocks in theh store.  If an error is returned by the callback
+// Iter iterates over blocks in theh store.  If an error is returned by the callback
 // iteration is immediately terminated returning the error.
-func (mem *MemBlockStore) IterBlocks(f func(block *structs.Block) error) error {
+func (mem *MemBlockStore) Iter(f func(block *structs.Block) error) error {
 	mem.mu.RLock()
 	for _, b := range mem.m {
 		if err := f(b); err != nil {
@@ -71,7 +71,7 @@ func (mem *MemBlockStore) IterBlocks(f func(block *structs.Block) error) error {
 	return nil
 }
 
-func (mem *MemBlockStore) IterBlockIDs(f func([]byte) error) error {
+func (mem *MemBlockStore) IterIDs(f func([]byte) error) error {
 	mem.mu.RLock()
 	for istr := range mem.m {
 
