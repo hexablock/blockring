@@ -63,17 +63,6 @@ func (cr *ChordRing) LookupHash(hash []byte, n int) (*chord.Vnode, []*chord.Vnod
 
 // LocateReplicatedKey returns vnodes where a key and replicas are located.
 func (cr *ChordRing) LocateReplicatedKey(key []byte, n int) ([]*structs.Location, error) {
-	// hashes := utils.ReplicatedKeyHashes(key, n)
-	// out := make([]*structs.Location, n)
-	//
-	// for i, h := range hashes {
-	// 	_, vs, err := cr.ring.LookupHash(cr.conf.NumSuccessors, h)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	out[i] = &structs.Location{Id: h, Vnode: vs[0]}
-	// }
-	// return out, nil
 	hash := fastsha256.Sum256(key)
 	return cr.LocateReplicatedHash(hash[:], n)
 }
@@ -84,25 +73,20 @@ func (cr *ChordRing) LocateReplicatedHash(hash []byte, n int) ([]*structs.Locati
 	//out := make([]*structs.Location, n)
 	out := map[string]*structs.Location{}
 
-	for _, h := range hashes {
-		// Lookup first replicated hash
+	for i, h := range hashes {
+		// Lookup successors for replicated hash
 		_, vs, err := cr.ring.LookupHash(cr.conf.NumSuccessors, h)
 		if err != nil {
 			return nil, err
 		}
 		// If we already have the current host location, go through the successors to find the
 		// next best location
-		if _, ok := out[vs[0].Host]; !ok {
-			out[string(h)] = &structs.Location{Id: h, Vnode: vs[0]}
-		} else {
-			for _, vn := range vs[1:] {
-				if _, ok := out[vn.Host]; !ok {
-					out[string(h)] = &structs.Location{Id: h, Vnode: vn}
-					break
-				}
+		for _, vn := range vs {
+			if _, ok := out[vn.Host]; !ok {
+				out[vn.Host] = &structs.Location{Id: h, Vnode: vn, Priority: int32(i)}
+				break
 			}
 		}
-
 	}
 
 	if len(out) != n {
@@ -110,8 +94,8 @@ func (cr *ChordRing) LocateReplicatedHash(hash []byte, n int) ([]*structs.Locati
 	}
 
 	o := make([]*structs.Location, n)
-	for i, h := range hashes {
-		o[i] = out[string(h)]
+	for _, v := range out {
+		o[v.Priority] = v
 	}
 
 	return o, nil

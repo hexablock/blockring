@@ -35,7 +35,7 @@ func initChordRing(addr string, peers ...string) (*ChordRing, error) {
 	return joinOrBootstrap(conf, ps, trans)
 }
 
-func TestChordRingBootstrap(t *testing.T) {
+func TestChordRingBootstrapError(t *testing.T) {
 	ring, err := initChordRing("127.0.0.1:43434")
 	if err != nil {
 		t.Fatal(err)
@@ -43,12 +43,9 @@ func TestChordRingBootstrap(t *testing.T) {
 
 	<-time.After(100 * time.Millisecond)
 
-	locs, err := ring.LocateReplicatedKey([]byte("key"), 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(locs) != 3 {
-		t.Fatal("should have 3")
+	_, err = ring.LocateReplicatedKey([]byte("key"), 3)
+	if err == nil {
+		t.Fatal("should fail")
 	}
 }
 
@@ -65,10 +62,17 @@ func TestChordRingJoin(t *testing.T) {
 	}
 	<-time.After(100 * time.Millisecond)
 
+	r3, err := initChordRing("127.0.0.1:43437", "127.0.0.1:43436")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-time.After(100 * time.Millisecond)
+
 	testkey := []byte("key")
 
 	rk1, _ := r1.LocateReplicatedKey(testkey, 3)
 	rk2, _ := r2.LocateReplicatedKey(testkey, 3)
+	r3.LocateReplicatedKey(testkey, 3)
 
 	f1 := false
 	for i, rk := range rk1 {
