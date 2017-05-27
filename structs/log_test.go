@@ -6,6 +6,55 @@ import (
 	"time"
 )
 
+var testEntry = &LogEntryBlock{
+	Key: []byte("my-test-key"),
+	Header: &LogEntryHeader{
+		PrevHash:  make([]byte, 32),
+		Height:    1,
+		Timestamp: uint64(time.Now().UnixNano()),
+		Source:    make([]byte, 40),
+	},
+	Signature: []byte("test-signature"),
+	Data:      []byte("some-test-data"),
+}
+
+func TestLogBlock(t *testing.T) {
+	lb := NewLogBlock([]byte("key"))
+	lb.Signature = []byte("signature")
+	lb.Header.Source = []byte("source")
+	if err := lb.AppendEntry(testEntry); err != nil {
+		t.Fatal(err)
+	}
+	lbb, _ := lb.MarshalBinary()
+
+	var lb2 LogBlock
+	if err := lb2.UnmarshalBinary(lbb); err != nil {
+		t.Fatal(err)
+	}
+
+	if lb2.Header.Timestamp != lb.Header.Timestamp {
+		t.Fatal("mismatch")
+	}
+
+	if string(lb.Signature) != "signature" {
+		t.Error("signature mismatch")
+	}
+
+	if string(lb.Header.Source) != "source" {
+		t.Error("source mismatch")
+	}
+
+	if lb.Height() != lb2.Height() {
+		t.Error("hieght mismatch")
+	}
+
+	for i := range lb.Entries {
+		if bytes.Compare(lb.Entries[i], lb2.Entries[i]) != 0 {
+			t.Fatalf("mismatch %d. %x!=%x", i, lb.Entries[i], lb2.Entries[i])
+		}
+	}
+}
+
 func TestHeader(t *testing.T) {
 	h1 := &LogEntryHeader{
 		PrevHash:  make([]byte, 32),
@@ -38,19 +87,7 @@ func TestHeader(t *testing.T) {
 
 func TestEntry(t *testing.T) {
 
-	ent := &LogEntryBlock{
-		Key: []byte("my-test-key"),
-		Header: &LogEntryHeader{
-			PrevHash:  make([]byte, 32),
-			Height:    1,
-			Timestamp: uint64(time.Now().UnixNano()),
-			Source:    make([]byte, 40),
-		},
-		Signature: []byte("test-signature"),
-		Data:      []byte("some-test-data"),
-	}
-
-	b, err := ent.MarshalBinary()
+	b, err := testEntry.MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,13 +97,13 @@ func TestEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if bytes.Compare(ent1.Key, ent.Key) != 0 {
+	if bytes.Compare(ent1.Key, testEntry.Key) != 0 {
 		t.Fatal("key mismatch")
 	}
-	if bytes.Compare(ent.Signature, ent1.Signature) != 0 {
+	if bytes.Compare(testEntry.Signature, ent1.Signature) != 0 {
 		t.Fatal("sig mismatch")
 	}
-	if bytes.Compare(ent.Data, ent1.Data) != 0 {
+	if bytes.Compare(testEntry.Data, ent1.Data) != 0 {
 		t.Fatal("data mismatch")
 	}
 

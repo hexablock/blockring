@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/fastsha256"
 	"github.com/hexablock/log"
 
 	"github.com/hexablock/blockring/store"
@@ -62,32 +63,58 @@ func (cr *ChordRing) LookupHash(hash []byte, n int) (*chord.Vnode, []*chord.Vnod
 
 // LocateReplicatedKey returns vnodes where a key and replicas are located.
 func (cr *ChordRing) LocateReplicatedKey(key []byte, n int) ([]*structs.Location, error) {
-	hashes := utils.ReplicatedKeyHashes(key, n)
-	out := make([]*structs.Location, n)
-
-	for i, h := range hashes {
-		_, vs, err := cr.ring.LookupHash(1, h)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = &structs.Location{Id: h, Vnode: vs[0]}
-	}
-	return out, nil
+	// hashes := utils.ReplicatedKeyHashes(key, n)
+	// out := make([]*structs.Location, n)
+	//
+	// for i, h := range hashes {
+	// 	_, vs, err := cr.ring.LookupHash(cr.conf.NumSuccessors, h)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	out[i] = &structs.Location{Id: h, Vnode: vs[0]}
+	// }
+	// return out, nil
+	hash := fastsha256.Sum256(key)
+	return cr.LocateReplicatedHash(hash[:], n)
 }
 
 // LocateReplicatedHash returns vnodes where a key and replicas are located.
 func (cr *ChordRing) LocateReplicatedHash(hash []byte, n int) ([]*structs.Location, error) {
 	hashes := utils.ReplicaHashes(hash, n)
-	out := make([]*structs.Location, n)
+	//out := make([]*structs.Location, n)
+	out := map[string]*structs.Location{}
 
-	for i, h := range hashes {
-		_, vs, err := cr.ring.LookupHash(1, h)
+	for _, h := range hashes {
+		// Lookup first replicated hash
+		_, vs, err := cr.ring.LookupHash(cr.conf.NumSuccessors, h)
 		if err != nil {
 			return nil, err
 		}
-		out[i] = &structs.Location{Id: h, Vnode: vs[0]}
+		// If we already have the current host location, go through the successors to find the
+		// next best location
+		if _, ok := out[vs[0].Host]; !ok {
+			out[string(h)] = &structs.Location{Id: h, Vnode: vs[0]}
+		} else {
+			for _, vn := range vs[1:] {
+				if _, ok := out[vn.Host]; !ok {
+					out[string(h)] = &structs.Location{Id: h, Vnode: vn}
+					break
+				}
+			}
+		}
+
 	}
-	return out, nil
+
+	if len(out) != n {
+		return nil, fmt.Errorf("not enough hosts found")
+	}
+
+	o := make([]*structs.Location, n)
+	for i, h := range hashes {
+		o[i] = out[string(h)]
+	}
+
+	return o, nil
 }
 
 // Hostname returns the hostname of the node per the config.

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"os"
 	"sync"
 
@@ -18,27 +17,24 @@ const (
 	fixedHeaderSize = 16
 )
 
-var (
-	errInvalidBlockData = errors.New("invalid block data")
-)
-
 // RootBlock contains the index information for a dataset.
 type RootBlock struct {
-	mu   sync.RWMutex
-	sz   uint64            // total data size
-	bs   uint32            // block size
-	mode os.FileMode       // file mode (uint32)
-	ids  map[uint64][]byte // data block id's
+	mu        sync.RWMutex
+	size      uint64            // total data size
+	blockSize uint32            // block size
+	mode      os.FileMode       // file mode (uint32)
+	ids       map[uint64][]byte // data block id's
 }
 
 // NewRootBlock instantiates a new RootBlock with defaults.
 func NewRootBlock() *RootBlock {
 	return &RootBlock{
-		ids: make(map[uint64][]byte),
-		bs:  DefaultBlockSize,
+		ids:       make(map[uint64][]byte),
+		blockSize: DefaultBlockSize,
 	}
 }
 
+// SetMode sets the mode on the RootBlock
 func (idx *RootBlock) SetMode(mode os.FileMode) {
 	idx.mode = mode
 }
@@ -50,12 +46,12 @@ func (idx *RootBlock) Mode() os.FileMode {
 
 // BlockSize returns the block size of the data
 func (idx *RootBlock) BlockSize() uint32 {
-	return idx.bs
+	return idx.blockSize
 }
 
 // SetBlockSize sets the block size
 func (idx *RootBlock) SetBlockSize(bs uint32) {
-	idx.bs = bs
+	idx.blockSize = bs
 }
 
 // Len returns the number of blocks in the root block
@@ -67,8 +63,8 @@ func (idx *RootBlock) Len() int {
 func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
 		"Type":      BlockType_ROOT,
-		"Size":      idx.sz,
-		"BlockSize": idx.bs,
+		"Size":      idx.size,
+		"BlockSize": idx.blockSize,
 		"Mode":      idx.mode,
 	}
 
@@ -84,7 +80,7 @@ func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 
 // Size returns the total size of the data
 func (idx *RootBlock) Size() uint64 {
-	return idx.sz
+	return idx.size
 }
 
 // AddBlock adds a block to the RootBlock at the given index.
@@ -92,7 +88,7 @@ func (idx *RootBlock) AddBlock(index uint64, blk *Block) {
 	id := blk.ID()
 
 	idx.mu.Lock()
-	idx.sz += uint64(len(blk.Data))
+	idx.size += uint64(len(blk.Data))
 	idx.ids[index] = id
 	idx.mu.Unlock()
 }
@@ -134,10 +130,10 @@ func (idx *RootBlock) EncodeBlock() *Block {
 	binary.BigEndian.PutUint32(mb, uint32(idx.mode))
 	// size
 	sb := make([]byte, 8)
-	binary.BigEndian.PutUint64(sb, idx.sz)
+	binary.BigEndian.PutUint64(sb, idx.size)
 	// block size
 	bs := make([]byte, 4)
-	binary.BigEndian.PutUint32(bs, idx.bs)
+	binary.BigEndian.PutUint32(bs, idx.blockSize)
 
 	blk.Data = utils.ConcatByteSlices(mb, sb, bs, bids)
 	return blk
@@ -153,8 +149,8 @@ func (idx *RootBlock) DecodeBlock(block *Block) error {
 	}
 
 	idx.mode = os.FileMode(binary.BigEndian.Uint32(block.Data[:4]))
-	idx.sz = binary.BigEndian.Uint64(block.Data[4:12])
-	idx.bs = binary.BigEndian.Uint32(block.Data[12:fixedHeaderSize])
+	idx.size = binary.BigEndian.Uint64(block.Data[4:12])
+	idx.blockSize = binary.BigEndian.Uint32(block.Data[12:fixedHeaderSize])
 	if (len(block.Data[fixedHeaderSize:]) % 32) != 0 {
 		return errInvalidBlockData
 	}

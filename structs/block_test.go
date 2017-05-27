@@ -34,7 +34,7 @@ func TestRootBlock(t *testing.T) {
 		ib.AddBlock(i+1, b)
 	}
 
-	if ib.sz != uint64(24) {
+	if ib.size != uint64(24) {
 		t.Fatal("invalid size")
 	}
 

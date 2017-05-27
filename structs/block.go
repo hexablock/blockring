@@ -9,13 +9,17 @@ import (
 )
 
 var (
+	// ErrInvalidBlockType is used when the block has an unrecognized type
 	ErrInvalidBlockType = errors.New("invalid block type")
+	errInvalidBlockData = errors.New("invalid block data")
 )
 
+// NewDataBlock instantiates a new data block with the given data
 func NewDataBlock(data []byte) *Block {
 	return &Block{Type: BlockType_DATA, Data: data}
 }
 
+// MarshalBinary marshals the block into a byte slice.
 func (blk *Block) MarshalBinary() ([]byte, error) {
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b, uint32(blk.Type))
@@ -52,7 +56,7 @@ func (blk *Block) ID() []byte {
 }
 
 // Size returns the size of the data if a DATABLOCK and the cummulative size of all blocks if it is
-// an INDEXBLOCK
+// a RootBlock
 func (blk *Block) Size() uint64 {
 	switch blk.Type {
 	case BlockType_ROOT:

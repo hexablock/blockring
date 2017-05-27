@@ -28,13 +28,13 @@ type BlockTransport interface {
 
 // BlockRing is the core interface to perform operations around the ring.
 type BlockRing struct {
-	locator *locatorRouter
+	locator *locatorRouter // This could be client or server side locator
 
 	blkTrans BlockTransport
 	logTrans LogTransport
 
-	ch               chan<- *rpc.BlockRPCData // send only channel for block transfer requests
-	proxShiftEnabled bool                     // proximity shifting
+	ch               chan<- *rpc.BlockRPCData // Send only channel for block transfer requests
+	proxShiftEnabled bool                     // Proximity shifting
 }
 
 // NewBlockRing instantiates an instance.  If the channel is not nil, proximity shifting is
@@ -221,18 +221,20 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 			go func(loc *structs.Location) {
 
 				if atomic.LoadInt32(&bail) == 0 {
-					if !utils.EqualBytes(loc.Vnode.Id, opts.Source) {
+
+					if !utils.EqualBytes(loc.Id, opts.Source) {
 						o := structs.RequestOptions{
-							Destination: loc.Vnode.Id,
+							Destination: loc.Id,
 							Source:      opts.Source,
 							PeerSetSize: opts.PeerSetSize,
 							PeerSetKey:  loc.Id,
 						}
+
 						if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 							errCh <- er
 						}
-
 					}
+
 				}
 				wg.Done()
 
@@ -248,11 +250,12 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 
 				if atomic.LoadInt32(&bail) == 0 {
 					o := structs.RequestOptions{
-						Destination: loc.Vnode.Id,
-						Source:      loc.Vnode.Id,
+						Destination: loc.Id,
+						Source:      loc.Id,
 						PeerSetSize: opts.PeerSetSize,
 						PeerSetKey:  loc.Id,
 					}
+
 					if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 						errCh <- er
 					}
@@ -304,11 +307,14 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 			go func(loc *structs.Location) {
 				if atomic.LoadInt32(&bail) == 0 {
 
-					if !utils.EqualBytes(loc.Vnode.Id, opts.Source) {
-
-						opts.Destination = loc.Vnode.Id
-						opts.PeerSetKey = loc.Id
-						if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
+					if !utils.EqualBytes(loc.Id, opts.Source) {
+						o := structs.RequestOptions{
+							Destination: loc.Id,
+							PeerSetKey:  loc.Id,
+							Source:      opts.Source,
+							PeerSetSize: opts.PeerSetSize,
+						}
+						if _, er := br.logTrans.CommitEntry(loc, tx, o); er != nil {
 							errCh <- er
 						}
 					}
@@ -324,12 +330,14 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 
 			go func(loc *structs.Location) {
 				if atomic.LoadInt32(&bail) == 0 {
+					o := structs.RequestOptions{
+						PeerSetSize: opts.PeerSetSize,
+						Source:      loc.Id,
+						Destination: loc.Id,
+						PeerSetKey:  loc.Id,
+					}
 
-					opts.Source = loc.Vnode.Id
-					opts.Destination = loc.Vnode.Id
-					opts.PeerSetKey = loc.Id
-					//log.Printf("action=commit src=%x dst=%s", opts.Source, utils.ShortVnodeID(loc.Vnode))
-					if _, er := br.logTrans.CommitEntry(loc, tx, opts); er != nil {
+					if _, er := br.logTrans.CommitEntry(loc, tx, o); er != nil {
 						errCh <- er
 					}
 
