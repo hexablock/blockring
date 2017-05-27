@@ -39,7 +39,7 @@ func TestRootBlock(t *testing.T) {
 	}
 
 	blk := ib.EncodeBlock()
-	if len(blk.Data) != 12+(3*32) {
+	if len(blk.Data) != fixedHeaderSize+(3*32) {
 		t.Fatal("invalid size", len(blk.Data))
 	}
 

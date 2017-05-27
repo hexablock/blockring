@@ -14,6 +14,7 @@ import (
 	"github.com/hexablock/blockring/utils"
 )
 
+// ChordDelegate primarily handles the movement of data when nodes join and leave the ring.
 type ChordDelegate struct {
 	Store    *BlockRingTransport
 	LogTrans *LogRingTransport
@@ -24,7 +25,7 @@ type ChordDelegate struct {
 	// Incoming candidate blocks to be locally stored i.e. taken over. These are either stored or
 	// forwarded based on location ID
 	InBlocks chan *rpc.BlockRPCData
-
+	// Track peers when ring changes occur
 	peerStore store.PeerStore
 }
 
@@ -89,7 +90,7 @@ func (s *ChordDelegate) takeoverOrRouteLogBlock(brd *rpc.BlockRPCData) error {
 	if loc.Vnode.Host == s.ring.Hostname() {
 		s.takeoverLogBlock(key, loc)
 	} else {
-		// re-route
+		// // Re-route to primary
 		log.Printf("[DEBUG] action=route phase=begin key/%s dst=%s", key, utils.ShortVnodeID(loc.Vnode))
 		if _, err = s.LogTrans.TransferLogBlock(loc, key, structs.RequestOptions{}); err != nil {
 			log.Printf("[ERROR] action=route phase=failed key/%s dst=%s msg='%v'", key, utils.ShortVnodeID(loc.Vnode), err)
@@ -111,7 +112,7 @@ func (s *ChordDelegate) takeoverOrRouteBlock(b *rpc.BlockRPCData) error {
 	if loc.Vnode.Host == s.ring.Hostname() {
 		s.takeoverBlock(id, b.Location)
 	} else {
-		// re-route
+		// Re-route to primary
 		log.Printf("[DEBUG] action=route phase=begin block/%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
 		if err = s.Store.remote.TransferBlock(loc, id); err != nil {
 			log.Printf("[ERROR] action=route phase=failed block/%x dst=%s msg='%v'", id, utils.ShortVnodeID(loc.Vnode), err)
