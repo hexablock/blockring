@@ -66,11 +66,13 @@ func NewLogBlock(key []byte) *LogBlock {
 	}
 }
 
+// EncodeBlock encodes the LogBlock into a Block.
 func (t *LogBlock) EncodeBlock() (*Block, error) {
 	d, _ := t.MarshalBinary()
 	return &Block{Type: BlockType_LOG, Data: d}, nil
 }
 
+// DecodeBlock decodes a block into a LogBlock
 func (t *LogBlock) DecodeBlock(blk *Block) error {
 	if blk.Type != BlockType_LOG {
 		return ErrInvalidBlockType
@@ -183,9 +185,10 @@ func (t *LogBlock) Height() int {
 // MarshalJSON custom marshal LogBlock to be human readable.
 func (t *LogBlock) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
-		"Key":    string(t.Key),
-		"Header": t.Header,
-		"Root":   fmt.Sprintf("%x", t.Root),
+		"Key":       string(t.Key),
+		"Header":    t.Header,
+		"Root":      hex.EncodeToString(t.Root),
+		"Signature": hex.EncodeToString(t.Signature),
 	}
 
 	s := make([]string, len(t.Entries))

@@ -184,7 +184,7 @@ func (t *LogNetTransport) ProposeEntryRPC(ctx context.Context, req *rpc.BlockRPC
 	var entry structs.LogEntryBlock
 	err := entry.UnmarshalBinary(req.Block.Data)
 	if err == nil {
-		err = t.txl.ProposeEntry(&entry, opts)
+		_, err = t.txl.ProposeEntry(&entry, opts)
 	}
 
 	return &rpc.BlockRPCData{}, err
@@ -232,7 +232,8 @@ func (lt *LogRingTransport) TransferLogBlock(loc *structs.Location, key []byte, 
 
 func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	if lt.host == loc.Vnode.Host {
-		return &structs.Location{}, lt.txl.ProposeEntry(tx, opts)
+		_, err := lt.txl.ProposeEntry(tx, opts)
+		return &structs.Location{}, err
 	}
 	return lt.remote.ProposeEntry(loc, tx, opts)
 }

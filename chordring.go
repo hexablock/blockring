@@ -17,7 +17,8 @@ import (
 
 var errNoPeersFound = errors.New("no peers found")
 
-// ChordRing contains
+// ChordRing is a node part of the chord ring allowing to perform ring operations.  This is used on
+// peers participating in the ring.
 type ChordRing struct {
 	conf      *chord.Config
 	trans     *chord.GRPCTransport

@@ -45,7 +45,7 @@ func (s *ChordDelegate) Register(ring *ChordRing, blockRing *BlockRing) {
 }
 
 func (s *ChordDelegate) takeoverLogBlock(key []byte, loc *structs.Location) {
-	// get block from network
+	// Get block from network
 	opts := structs.RequestOptions{PeerSetKey: loc.Id, PeerSetSize: int32(s.ring.NumSuccessors())}
 	blk, _, err := s.LogTrans.GetLogBlock(loc, key, opts)
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *ChordDelegate) takeoverLogBlock(key []byte, loc *structs.Location) {
 }
 
 func (s *ChordDelegate) takeoverBlock(id []byte, loc *structs.Location) {
-	// skip if we have the block
+	// Skip if we have the block
 	if _, err := s.Store.local.GetBlock(id); err == nil {
 		return
 	}
@@ -172,16 +172,15 @@ func (s *ChordDelegate) transferLogBlocks(local, remote *chord.Vnode) error {
 
 // transfer all but LogBlocks
 func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
+	// Iterate id's and pick which ones to transfer
 	return s.Store.local.IterIDs(func(id []byte) error {
-		//
-		// Handle transferring natural keys.
-		//
-
-		// skip blocks that do not belong to the new remote
+		// Skip blocks that do not belong to the new remote
 		if bytes.Compare(id, remote.Id) >= 0 {
 			return nil
 		}
-
+		//
+		// Handle transferring natural keys.
+		//
 		loc := &structs.Location{Id: id, Vnode: remote}
 		log.Printf("[DEBUG] action=transfer phase=begin block=%x dst=%s", id, utils.ShortVnodeID(remote))
 		if err := s.Store.remote.TransferBlock(loc, id); err != nil {
@@ -201,11 +200,11 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 // NewPredecessor is called when a new predecessor is found
 func (s *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnode) {
 	log.Printf("[INFO] event=predecessor pred=%s local=%s", utils.ShortVnodeID(remoteNew), utils.ShortVnodeID(local))
-	// nothing to do if new predecessor is local.
+	// Nothing to do if new predecessor is local.
 	if local.Host == remoteNew.Host {
 		return
 	}
-	// add the new peer to our list of known peers
+	// Add new peer to our list of known peers
 	s.peerStore.AddPeer(remoteNew.Host)
 
 	if err := s.transferLogBlocks(local, remoteNew); err != nil {

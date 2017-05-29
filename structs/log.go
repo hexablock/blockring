@@ -164,7 +164,6 @@ func (entry *LogEntryBlock) UnmarshalBinary(b []byte) error {
 	sigSize := binary.BigEndian.Uint16(b[ei : ei+2])
 	ei += 2
 	entry.Signature = b[ei : ei+uint64(sigSize)]
-	//ei += uint64(sigSize)
 
 	return nil
 }
