@@ -23,17 +23,6 @@ func NewBlockNetTransportClient(reapInterval, maxIdle int) *BlockNetTransportCli
 	return &BlockNetTransportClient{out: pool.NewOutConnPool(reapInterval, maxIdle)}
 }
 
-func (s *BlockNetTransportClient) GetEntry(loc *structs.Location, id []byte) (*structs.LogEntryBlock, error) {
-	blk, err := s.GetBlock(loc, id)
-	if err == nil {
-		var le structs.LogEntryBlock
-		err = le.DecodeBlock(blk)
-		return &le, err
-	}
-
-	return nil, err
-}
-
 func (s *BlockNetTransportClient) GetBlock(loc *structs.Location, id []byte) (*structs.Block, error) {
 	conn, err := s.out.Get(loc.Vnode.Host)
 	if err != nil {
@@ -63,6 +52,7 @@ func (s *BlockNetTransportClient) SetBlock(loc *structs.Location, block *structs
 	return err
 }
 
+// TransferBlock submits a transfer request to the location for a Block by its id
 func (s *BlockNetTransportClient) TransferBlock(loc *structs.Location, id []byte) error {
 	conn, err := s.out.Get(loc.Vnode.Host)
 	if err != nil {
@@ -133,7 +123,8 @@ func (s *BlockNetTransport) ReleaseBlockRPC(ctx context.Context, in *rpc.BlockRP
 	return &rpc.BlockRPCData{}, err
 }
 
-// BlockRingTransport allows to make requests based on Location around the ring.
+// BlockRingTransport allows to make block requests based on Location around the ring.  It appropriately
+// makes calls to the local or remote locations
 type BlockRingTransport struct {
 	host   string
 	local  store.BlockStore

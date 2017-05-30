@@ -20,16 +20,16 @@ const (
 // RootBlock contains the index information for a dataset.
 type RootBlock struct {
 	mu        sync.RWMutex
-	size      uint64            // total data size
-	blockSize uint32            // block size
-	mode      os.FileMode       // file mode (uint32)
-	ids       map[uint64][]byte // data block id's
+	size      uint64            // Sum of data size for all ref'd blocks.
+	blockSize uint32            // Size of each block. Last block will be less than this.
+	mode      os.FileMode       // File mode (uint32)
+	blocks    map[uint64][]byte // Block ids that belong to this block.
 }
 
 // NewRootBlock instantiates a new RootBlock with defaults.
 func NewRootBlock() *RootBlock {
 	return &RootBlock{
-		ids:       make(map[uint64][]byte),
+		blocks:    make(map[uint64][]byte),
 		blockSize: DefaultBlockSize,
 	}
 }
@@ -56,7 +56,7 @@ func (idx *RootBlock) SetBlockSize(bs uint32) {
 
 // Len returns the number of blocks in the root block
 func (idx *RootBlock) Len() int {
-	return len(idx.ids)
+	return len(idx.blocks)
 }
 
 // MarshalJSON is a custom json marshaller to handle hashes
@@ -68,7 +68,7 @@ func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 		"Mode":      idx.mode,
 	}
 
-	ids := make([]string, len(idx.ids))
+	ids := make([]string, len(idx.blocks))
 	idx.Iter(func(index uint64, id []byte) error {
 		ids[index] = hex.EncodeToString(id)
 		return nil
@@ -89,16 +89,16 @@ func (idx *RootBlock) AddBlock(index uint64, blk *Block) {
 
 	idx.mu.Lock()
 	idx.size += uint64(len(blk.Data))
-	idx.ids[index] = id
+	idx.blocks[index] = id
 	idx.mu.Unlock()
 }
 
 // Iter iterates over each block id in order.
 func (idx *RootBlock) Iter(f func(index uint64, id []byte) error) error {
 	// sort by index
-	keys := make([][]byte, len(idx.ids))
-	for i := range idx.ids {
-		keys[i-1] = idx.ids[i]
+	keys := make([][]byte, len(idx.blocks))
+	for i := range idx.blocks {
+		keys[i-1] = idx.blocks[i]
 	}
 
 	for i, k := range keys {
@@ -117,9 +117,9 @@ func (idx *RootBlock) ID() []byte {
 
 // EncodeBlock encodes the RootBlock into a Block
 func (idx *RootBlock) EncodeBlock() *Block {
-	a := make([][]byte, len(idx.ids))
-	for i := range idx.ids {
-		a[i-1] = idx.ids[i]
+	a := make([][]byte, len(idx.blocks))
+	for i := range idx.blocks {
+		a[i-1] = idx.blocks[i]
 	}
 
 	bids := utils.ConcatByteSlices(a...)
@@ -155,11 +155,11 @@ func (idx *RootBlock) DecodeBlock(block *Block) error {
 		return errInvalidBlockData
 	}
 
-	idx.ids = make(map[uint64][]byte)
+	idx.blocks = make(map[uint64][]byte)
 	c := uint64(1)
 	l := uint64(len(block.Data))
 	for i := uint64(fixedHeaderSize); i < l; i += 32 {
-		idx.ids[c] = block.Data[i : i+32]
+		idx.blocks[c] = block.Data[i : i+32]
 		c++
 	}
 

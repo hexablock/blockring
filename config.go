@@ -25,13 +25,16 @@ type Config struct {
 	RetryJoin      bool         // keep trying peers on failure
 	Timeouts       *NetTimeouts // Network timeouts
 	InBlockBufSize int
+
+	RequiredVotes int
 }
 
 // DefaultConfig returns a sane config
 func DefaultConfig() *Config {
 	c := &Config{
-		Chord:    chord.DefaultConfig(""),
-		Timeouts: DefaultNetTimeouts(),
+		Chord:         chord.DefaultConfig(""),
+		Timeouts:      DefaultNetTimeouts(),
+		RequiredVotes: 3,
 	}
 
 	c.Chord.NumSuccessors = defaultNumSuccessors

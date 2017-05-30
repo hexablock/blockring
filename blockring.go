@@ -11,8 +11,9 @@ import (
 
 // LogTransport implements a transport for the distributed log
 type LogTransport interface {
-	ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
+	GetEntry(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error)
 	NewEntry(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error)
+	ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
 	CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
 	GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error)
 	TransferLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.Location, error)
@@ -121,6 +122,7 @@ func (br *BlockRing) GetBlock(id []byte, opts ...structs.RequestOptions) (*struc
 				},
 			}
 		}*/
+
 	}
 
 	return loc, blk, err
@@ -158,21 +160,43 @@ func (br *BlockRing) GetLogBlock(key []byte, opts structs.RequestOptions) (*stru
 		if blk == nil {
 			err = utils.ErrNotFound
 		}
+		//if br.proxShiftEnabled {}
 	}
 
 	return loc, blk, err
 
 }
 
+// GetBlockFrom gets a Block from the specified Location
+func (br *BlockRing) GetBlockFrom(id []byte, loc *structs.Location) (*structs.Block, error) {
+	return br.blkTrans.GetBlock(loc, id)
+}
+
 // GetEntry gets a LogEntryBlock from the ring.
 func (br *BlockRing) GetEntry(id []byte, opts structs.RequestOptions) (*structs.Location, *structs.LogEntryBlock, error) {
-	loc, block, err := br.GetBlock(id, opts)
+
+	var (
+		blk *structs.LogEntryBlock
+		loc *structs.Location
+	)
+
+	err := br.locator.RouteHash(id, int(opts.PeerSetSize), func(l *structs.Location) bool {
+		if b, _, err := br.logTrans.GetEntry(l, id, opts); err == nil {
+			blk = b
+			loc = l
+			return false
+		}
+		return true
+	})
+
 	if err == nil {
-		var le structs.LogEntryBlock
-		err = le.DecodeBlock(block)
-		return loc, &le, err
+		if blk == nil {
+			err = utils.ErrNotFound
+		}
+		//if br.proxShiftEnabled {}
 	}
-	return loc, nil, err
+
+	return loc, blk, err
 }
 
 // NewEntry gets a new entry from the log.

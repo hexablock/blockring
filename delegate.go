@@ -3,7 +3,6 @@ package blockring
 import (
 	"bytes"
 
-	"github.com/btcsuite/fastsha256"
 	"github.com/hexablock/log"
 
 	chord "github.com/ipkg/go-chord"
@@ -22,6 +21,8 @@ type ChordDelegate struct {
 	ring      *ChordRing
 	blockRing *BlockRing
 
+	conf *Config
+
 	// Incoming candidate blocks to be locally stored i.e. taken over. These are either stored or
 	// forwarded based on location ID
 	InBlocks chan *rpc.BlockRPCData
@@ -29,9 +30,10 @@ type ChordDelegate struct {
 	peerStore store.PeerStore
 }
 
-func NewChordDelegate(peerStore store.PeerStore, inBlockBufSize int) *ChordDelegate {
+func NewChordDelegate(peerStore store.PeerStore, conf *Config) *ChordDelegate {
 	return &ChordDelegate{
-		InBlocks:  make(chan *rpc.BlockRPCData, inBlockBufSize),
+		conf:      conf,
+		InBlocks:  make(chan *rpc.BlockRPCData, conf.InBlockBufSize),
 		peerStore: peerStore,
 	}
 }
@@ -47,6 +49,8 @@ func (s *ChordDelegate) Register(ring *ChordRing, blockRing *BlockRing) {
 func (s *ChordDelegate) takeoverLogBlock(key []byte, loc *structs.Location) {
 	// Get block from network
 	opts := structs.RequestOptions{PeerSetKey: loc.Id, PeerSetSize: int32(s.ring.NumSuccessors())}
+
+	//_, blk, err := s.blockRing.GetLogBlock(key, opts)
 	blk, _, err := s.LogTrans.GetLogBlock(loc, key, opts)
 	if err != nil {
 		log.Printf("[ERROR] action=takeover phase=failed key=%s  msg='Failed to get log block: %v'", key, err)
@@ -80,24 +84,15 @@ func (s *ChordDelegate) takeoverBlock(id []byte, loc *structs.Location) {
 
 func (s *ChordDelegate) takeoverOrRouteLogBlock(brd *rpc.BlockRPCData) error {
 	key := brd.ID
-	locs, err := s.ring.LocateReplicatedKey(key, 1)
-
+	locs, err := s.ring.LocateReplicatedKey(key, s.conf.RequiredVotes)
 	if err != nil {
 		return err
 	}
 
 	loc := locs[0]
-	if loc.Vnode.Host == s.ring.Hostname() {
-		s.takeoverLogBlock(key, loc)
-	} else {
-		// // Re-route to primary
-		log.Printf("[DEBUG] action=route phase=begin key=%s dst=%s", key, utils.ShortVnodeID(loc.Vnode))
-		if _, err = s.LogTrans.TransferLogBlock(loc, key, structs.RequestOptions{}); err != nil {
-			log.Printf("[ERROR] action=route phase=failed key=%s dst=%s msg='%v'", key, utils.ShortVnodeID(loc.Vnode), err)
-		} else {
-			log.Printf("[DEBUG] action=route phase=complete key=%s dst=%s", key, utils.ShortVnodeID(loc.Vnode))
-		}
-	}
+	s.takeoverLogBlock(key, loc)
+	// TODO: may need to re-route
+
 	return nil
 }
 
@@ -143,23 +138,29 @@ func (s *ChordDelegate) startConsuming() {
 }
 
 func (s *ChordDelegate) transferLogBlocks(local, remote *chord.Vnode) error {
+
 	return s.LogTrans.bs.IterKeys(func(key []byte) error {
 		//
 		// Handle transferring natural keys.
 		//
 
-		sh := fastsha256.Sum256(key)
-		// skip blocks that do not belong to the new remote
-		if bytes.Compare(sh[:], remote.Id) >= 0 {
-			return nil
-		}
+		hashes := utils.ReplicatedKeyHashes(key, s.conf.RequiredVotes)
+		for _, h := range hashes {
+			// Skip ones that belong to us.
+			// TODO: improve logic
+			if bytes.Compare(h, remote.Id) >= 0 {
+				continue
+			}
 
-		loc := &structs.Location{Id: sh[:], Vnode: remote}
-		log.Printf("[DEBUG] action=transfer phase=begin key=%s dst=%s", key, utils.ShortVnodeID(remote))
-		if _, err := s.LogTrans.TransferLogBlock(loc, key, structs.RequestOptions{}); err != nil {
-			log.Printf("[ERROR] action=transfer phase=failed key=%s dst=%s msg='%v'", key, utils.ShortVnodeID(remote), err)
-		} else {
-			log.Printf("[DEBUG] action=transfer phase=complete key=%s dst=%s", key, utils.ShortVnodeID(remote))
+			loc := &structs.Location{Id: h, Vnode: remote}
+			log.Printf("[DEBUG] action=transfer phase=begin key=%s dst=%s", key, utils.ShortVnodeID(remote))
+			if _, err := s.LogTrans.TransferLogBlock(loc, key, structs.RequestOptions{}); err != nil {
+				log.Printf("[ERROR] action=transfer phase=failed key=%s dst=%s msg='%v'", key, utils.ShortVnodeID(remote), err)
+			} else {
+				log.Printf("[DEBUG] action=transfer phase=complete key=%s dst=%s", key, utils.ShortVnodeID(remote))
+			}
+
+			break
 		}
 
 		//

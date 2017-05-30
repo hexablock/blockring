@@ -48,8 +48,8 @@ func TestRootBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for k := range root.ids {
-		if _, ok := ib.ids[k]; !ok {
+	for k := range root.blocks {
+		if _, ok := ib.blocks[k]; !ok {
 			t.Error(k, "not found")
 		}
 	}

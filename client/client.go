@@ -97,6 +97,8 @@ func (client *Client) NewEntry(key []byte, opts structs.RequestOptions) (*struct
 func (client *Client) ProposeEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	return client.rs.ProposeEntry(tx, opts)
 }
+
+// GetLogBlock gets the first LogBlock of the given key
 func (client *Client) GetLogBlock(key []byte, opts structs.RequestOptions) (*structs.Location, *structs.LogBlock, error) {
 	return client.rs.GetLogBlock(key, opts)
 }
@@ -109,4 +111,9 @@ func (client *Client) SetBlock(block *structs.Block, opts ...structs.RequestOpti
 // GetBlock gets a block given the id.  It returns the first available block.
 func (client *Client) GetBlock(id []byte, opts ...structs.RequestOptions) (*structs.Location, *structs.Block, error) {
 	return client.rs.GetBlock(id, opts...)
+}
+
+// GetBlockFrom tries to retrieve a Block from a specific location.
+func (client *Client) GetBlockFrom(id []byte, loc *structs.Location) (*structs.Block, error) {
+	return client.rs.GetBlockFrom(id, loc)
 }
