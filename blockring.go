@@ -16,14 +16,14 @@ type LogTransport interface {
 	ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
 	CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
 	GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error)
-	TransferLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.Location, error)
+	TransferLogBlock(key []byte, src, dst *structs.Location) error
 }
 
 // BlockTransport implements the transport interface for the block store.
 type BlockTransport interface {
 	GetBlock(loc *structs.Location, id []byte) (*structs.Block, error)
 	SetBlock(loc *structs.Location, block *structs.Block) error
-	TransferBlock(loc *structs.Location, id []byte) error
+	TransferBlock(id []byte, src, dst *structs.Location) error
 	ReleaseBlock(loc *structs.Location, id []byte) error
 }
 
@@ -34,13 +34,13 @@ type BlockRing struct {
 	blkTrans BlockTransport
 	logTrans LogTransport
 
-	ch               chan<- *rpc.BlockRPCData // Send only channel for block transfer requests
-	proxShiftEnabled bool                     // Proximity shifting
+	ch               chan<- *rpc.RelocateRPCData // Send only channel for block transfer requests
+	proxShiftEnabled bool                        // Proximity shifting
 }
 
 // NewBlockRing instantiates an instance.  If the channel is not nil, proximity shifting is
 // automatically enabled.
-func NewBlockRing(locator Locator, blkTrans BlockTransport, logTrans LogTransport, ch chan<- *rpc.BlockRPCData) *BlockRing {
+func NewBlockRing(locator Locator, blkTrans BlockTransport, logTrans LogTransport, ch chan<- *rpc.RelocateRPCData) *BlockRing {
 	rs := &BlockRing{
 		locator:  &locatorRouter{Locator: locator},
 		blkTrans: blkTrans,

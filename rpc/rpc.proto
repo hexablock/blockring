@@ -6,13 +6,6 @@ package rpc;
 import "github.com/hexablock/blockring/structs/structs.proto";
 import "github.com/ipkg/go-chord/net.proto";
 
-service BlockRPC {
-    rpc GetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
-    rpc SetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
-    rpc TransferBlockRPC(BlockRPCData) returns (BlockRPCData) {}
-    rpc ReleaseBlockRPC(BlockRPCData) returns (BlockRPCData) {}
-}
-
 service LocateRPC {
     rpc LookupKeyRPC(LocateRequest) returns (LocateResponse) {}
     rpc LookupHashRPC(LocateRequest) returns (LocateResponse) {}
@@ -21,13 +14,20 @@ service LocateRPC {
     rpc NegotiateRPC(NegotiateRequest) returns (NegotiateResponse) {}
 }
 
+service BlockRPC {
+    rpc GetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc SetBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc TransferBlockRPC(RelocateRPCData) returns (RelocateRPCData) {}
+    rpc ReleaseBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+}
+
 service LogRPC {
     rpc GetEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc NewEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc ProposeEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc CommitEntryRPC(BlockRPCData) returns (BlockRPCData) {}
     rpc GetLogBlockRPC(BlockRPCData) returns (BlockRPCData) {}
-    rpc TransferLogBlockRPC(BlockRPCData) returns (BlockRPCData) {}
+    rpc TransferLogBlockRPC(RelocateRPCData) returns (RelocateRPCData) {}
     rpc ReleaseLogBlockRPC(BlockRPCData) returns (BlockRPCData) {}
 }
 
@@ -36,6 +36,13 @@ message BlockRPCData{
     structs.Block Block = 2;
     structs.Location Location = 3;
     structs.RequestOptions Options = 4;
+}
+
+message RelocateRPCData {
+    bytes ID = 1;
+    structs.Block Block = 2;
+    structs.Location Source = 3;
+    structs.Location Destination = 4;
 }
 
 message LocateRequest {

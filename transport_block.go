@@ -53,14 +53,14 @@ func (s *BlockNetTransportClient) SetBlock(loc *structs.Location, block *structs
 }
 
 // TransferBlock submits a transfer request to the location for a Block by its id
-func (s *BlockNetTransportClient) TransferBlock(loc *structs.Location, id []byte) error {
-	conn, err := s.out.Get(loc.Vnode.Host)
+func (s *BlockNetTransportClient) TransferBlock(id []byte, src, dst *structs.Location) error {
+	conn, err := s.out.Get(dst.Vnode.Host)
 	if err != nil {
 		return err
 	}
 
 	// TODO: use only block ids
-	req := &rpc.BlockRPCData{Location: loc, ID: id}
+	req := &rpc.RelocateRPCData{ID: id, Source: src, Destination: dst}
 	_, err = conn.BlockRPC.TransferBlockRPC(context.Background(), req)
 
 	s.out.Return(conn)
@@ -85,7 +85,7 @@ func (s *BlockNetTransportClient) ReleaseBlock(loc *structs.Location, id []byte)
 type BlockNetTransport struct {
 	st store.BlockStore
 	// potential inbound blocks
-	inBlocks chan *rpc.BlockRPCData
+	inBlocks chan *rpc.RelocateRPCData
 }
 
 func NewBlockNetTransport(bs store.BlockStore) *BlockNetTransport {
@@ -93,7 +93,7 @@ func NewBlockNetTransport(bs store.BlockStore) *BlockNetTransport {
 }
 
 // Register registers a channel where incoming blocks are sent for processing.
-func (s *BlockNetTransport) Register(ch chan *rpc.BlockRPCData) {
+func (s *BlockNetTransport) Register(ch chan *rpc.RelocateRPCData) {
 	s.inBlocks = ch
 }
 
@@ -112,10 +112,9 @@ func (s *BlockNetTransport) SetBlockRPC(ctx context.Context, in *rpc.BlockRPCDat
 	return &rpc.BlockRPCData{}, err
 }
 
-func (s *BlockNetTransport) TransferBlockRPC(ctx context.Context, in *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
-
+func (s *BlockNetTransport) TransferBlockRPC(ctx context.Context, in *rpc.RelocateRPCData) (*rpc.RelocateRPCData, error) {
 	s.inBlocks <- in
-	return &rpc.BlockRPCData{}, nil
+	return &rpc.RelocateRPCData{}, nil
 }
 
 func (s *BlockNetTransport) ReleaseBlockRPC(ctx context.Context, in *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
@@ -156,11 +155,11 @@ func (t *BlockRingTransport) SetBlock(loc *structs.Location, block *structs.Bloc
 	return t.remote.SetBlock(loc, block)
 }
 
-func (t *BlockRingTransport) TransferBlock(loc *structs.Location, id []byte) error {
-	if loc.Vnode.Host == t.host {
+func (t *BlockRingTransport) TransferBlock(id []byte, src, dst *structs.Location) error {
+	if dst.Vnode.Host == t.host {
 		return errNoLocalTransfer
 	}
-	return t.remote.TransferBlock(loc, id)
+	return t.remote.TransferBlock(id, src, dst)
 }
 
 func (t *BlockRingTransport) ReleaseBlock(loc *structs.Location, id []byte) error {

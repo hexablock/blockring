@@ -103,21 +103,25 @@ func (c *LogNetTransportClient) GetLogBlock(loc *structs.Location, key []byte, o
 }
 
 // TransferLogBlock submits a transfer request to the location for a LogBlock by the key
-func (c *LogNetTransportClient) TransferLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.Location, error) {
-	conn, err := c.out.Get(loc.Vnode.Host)
+func (c *LogNetTransportClient) TransferLogBlock(key []byte, src, dst *structs.Location) error {
+
+	conn, err := c.out.Get(dst.Vnode.Host)
 	if err != nil {
-		return nil, err
+		//return nil, err
+		return err
 	}
 
-	req := &rpc.BlockRPCData{ID: key, Options: &opts}
-	resp, err := conn.LogRPC.TransferLogBlockRPC(context.Background(), req)
+	//req := &rpc.BlockRPCData{ID: key, Options: &opts}
+	req := &rpc.RelocateRPCData{ID: key, Source: src, Destination: dst}
+	_, err = conn.LogRPC.TransferLogBlockRPC(context.Background(), req)
 	c.out.Return(conn)
 
-	if err == nil {
-		return resp.Location, nil
-	}
-
-	return nil, err
+	return err
+	// if err == nil {
+	// 	return resp.Location, nil
+	// }
+	//
+	// return nil, err
 }
 
 func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
@@ -141,24 +145,26 @@ func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.L
 	return nil, err
 }
 
+// LogNetTransport is the network transport for the consensus log.
 type LogNetTransport struct {
-	host        string
-	txl         *hexalog.HexaLog
-	bs          hexalog.BlockStore
-	inLogBlocks chan *rpc.BlockRPCData
+	host     string
+	txl      *hexalog.HexaLog
+	bs       hexalog.BlockStore
+	relocate chan *rpc.RelocateRPCData
 }
 
+// NewLogNetTransport instantiates a new log network transport with the host, HexaLog and BlockStore
 func NewLogNetTransport(host string, txl *hexalog.HexaLog, bs hexalog.BlockStore) *LogNetTransport {
 	return &LogNetTransport{
+		host: host,
 		txl:  txl,
 		bs:   bs,
-		host: host,
 	}
 }
 
 // Register registers a channel where incoming blocks are sent for processing.
-func (t *LogNetTransport) Register(ch chan *rpc.BlockRPCData) {
-	t.inLogBlocks = ch
+func (t *LogNetTransport) Register(ch chan *rpc.RelocateRPCData) {
+	t.relocate = ch
 }
 
 // GetLogBlockRPC serves a GetLogBlock request.
@@ -173,13 +179,11 @@ func (t *LogNetTransport) GetLogBlockRPC(ctx context.Context, req *rpc.BlockRPCD
 }
 
 // TransferLogBlockRPC submits a LogBlock transfer request to the local input block channel.
-func (t *LogNetTransport) TransferLogBlockRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
-	resp := &rpc.BlockRPCData{}
-
+func (t *LogNetTransport) TransferLogBlockRPC(ctx context.Context, req *rpc.RelocateRPCData) (*rpc.RelocateRPCData, error) {
 	req.Block = &structs.Block{Type: structs.BlockType_LOG}
-	t.inLogBlocks <- req
+	t.relocate <- req
 
-	return resp, nil
+	return &rpc.RelocateRPCData{}, nil
 }
 
 func (t *LogNetTransport) ReleaseLogBlockRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
@@ -193,6 +197,7 @@ func (t *LogNetTransport) ReleaseLogBlockRPC(ctx context.Context, req *rpc.Block
 	return resp, fmt.Errorf("TBI")
 }
 
+// GetEntryRPC serves a GetEntry request.
 func (t *LogNetTransport) GetEntryRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
 	entry, loc, err := t.txl.GetEntry(req.ID)
 	if err == nil {
@@ -261,13 +266,6 @@ func (lt *LogRingTransport) GetLogBlock(loc *structs.Location, key []byte, opts 
 	return lt.remote.GetLogBlock(loc, key, opts)
 }
 
-func (lt *LogRingTransport) TransferLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.Location, error) {
-	if lt.host == loc.Vnode.Host {
-		return nil, errNoLocalTransfer
-	}
-	return lt.remote.TransferLogBlock(loc, key, opts)
-}
-
 func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	if lt.host == loc.Vnode.Host {
 		_, err := lt.txl.ProposeEntry(tx, opts)
@@ -298,4 +296,13 @@ func (lt *LogRingTransport) CommitEntry(loc *structs.Location, tx *structs.LogEn
 		return &structs.Location{}, lt.txl.CommitEntry(tx, opts)
 	}
 	return lt.remote.CommitEntry(loc, tx, opts)
+}
+
+// TransferLogBlock makes a transfer request to the destination.  It returns an error if a local
+// transfer is initiated otherwise the remote transport error is returned.
+func (lt *LogRingTransport) TransferLogBlock(key []byte, src, dst *structs.Location) error {
+	if lt.host == dst.Vnode.Host {
+		return errNoLocalTransfer
+	}
+	return lt.remote.TransferLogBlock(key, src, dst)
 }
