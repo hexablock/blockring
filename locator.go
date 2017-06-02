@@ -2,6 +2,7 @@ package blockring
 
 import (
 	"errors"
+	"log"
 
 	"github.com/hexablock/blockring/structs"
 	"github.com/ipkg/difuse/utils"
@@ -20,14 +21,15 @@ type Locator interface {
 
 type locatorRouter struct {
 	Locator
+	maxSuccessors int
 }
 
 // RouteHash routes a hash around the ring visiting each vnode. It starts by looking up first n vnodes for the id.  If
 // the first batch of n vnodes does not contain the block, then the next n vnodes from the last vnode of the
 // previous batch is used until a full circle has been made around the ring.
-func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location) bool) error {
+func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(loc *structs.Location) bool) error {
 	if n < 1 {
-		return errLessThanOne
+		n = rl.maxSuccessors
 	}
 
 	_, vns, err := rl.LookupHash(hash, n)
@@ -35,8 +37,10 @@ func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location)
 		return err
 	}
 
-	lid := hash
-	svn := vns[0] //primary
+	//lid := hash
+
+	// Primary vnode
+	svn := vns[0]
 	pstart := int32(0)
 	// Try the primary vnode
 	loc := &structs.Location{Id: hash, Vnode: svn, Priority: pstart}
@@ -55,7 +59,7 @@ func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location)
 		out := make([]*chord.Vnode, 0, n)
 		for _, vn := range wset {
 			// If we are back at the starting vnode we've completed a full round.
-			// Set to exit after this iteration
+			// Set to exit
 			if utils.EqualBytes(svn.Id, vn.Id) {
 				done = true
 				break
@@ -68,7 +72,7 @@ func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location)
 			}
 
 		}
-
+		// Execute callback for each Location
 		for _, vn := range out {
 			loc := &structs.Location{Id: hash, Vnode: vn, Priority: pstart}
 			if !f(loc) {
@@ -76,14 +80,12 @@ func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location)
 			}
 			pstart++
 		}
-
+		// Bail if we have completed a full round around the ring
 		if done {
 			return nil
 		}
-
-		lid = out[len(out)-1].Id
-
-		// update the next set of vnodes to query
+		// Get the last queried vnode and update the set of vnodes to query next
+		lid := out[len(out)-1].Id
 		_, vn, err := rl.LookupHash(lid, n)
 		if err != nil {
 			return err
@@ -92,9 +94,9 @@ func (rl *locatorRouter) RouteHash(hash []byte, n int, f func(*structs.Location)
 	}
 }
 
-func (rl *locatorRouter) RouteKey(key []byte, n int, f func(*structs.Location) bool) error {
+func (rl *locatorRouter) RouteKey(key []byte, n int, f func(loc *structs.Location) bool) error {
 	if n < 1 {
-		return errLessThanOne
+		n = rl.maxSuccessors
 	}
 
 	keyhash, _, vns, err := rl.LookupKey(key, n)
@@ -102,7 +104,7 @@ func (rl *locatorRouter) RouteKey(key []byte, n int, f func(*structs.Location) b
 		return err
 	}
 
-	lid := keyhash
+	//lid := keyhash
 	svn := vns[0] // primary
 	pstart := int32(0)
 	// Try the primary vnode
@@ -120,10 +122,14 @@ func (rl *locatorRouter) RouteKey(key []byte, n int, f func(*structs.Location) b
 	for {
 		// exclude vnodes we have visited.
 		out := make([]*chord.Vnode, 0, n)
-		for _, vn := range wset {
+		for i, vn := range wset {
 			// If we are back at the starting vnode we've completed a full round.
 			// Set to exit after this iteration
 			if utils.EqualBytes(svn.Id, vn.Id) {
+				for _, vn := range wset[i:] {
+					log.Println(vn.StringID())
+				}
+
 				done = true
 				break
 			}
@@ -137,6 +143,7 @@ func (rl *locatorRouter) RouteKey(key []byte, n int, f func(*structs.Location) b
 		}
 
 		for _, vn := range out {
+			log.Println(vn.StringID())
 			loc := &structs.Location{Id: keyhash, Vnode: vn, Priority: pstart}
 			if !f(loc) {
 				return nil
@@ -148,13 +155,13 @@ func (rl *locatorRouter) RouteKey(key []byte, n int, f func(*structs.Location) b
 			return nil
 		}
 
-		lid = out[len(out)-1].Id
-
 		// update the next set of vnodes to query
+		lid := out[len(out)-1].Id
 		_, vn, err := rl.LookupHash(lid, n)
 		if err != nil {
 			return err
 		}
+
 		wset = vn
 	}
 }

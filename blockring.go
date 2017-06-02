@@ -1,6 +1,7 @@
 package blockring
 
 import (
+	"log"
 	"sync"
 	"sync/atomic"
 
@@ -40,9 +41,9 @@ type BlockRing struct {
 
 // NewBlockRing instantiates an instance.  If the channel is not nil, proximity shifting is
 // automatically enabled.
-func NewBlockRing(locator Locator, blkTrans BlockTransport, logTrans LogTransport, ch chan<- *rpc.RelocateRPCData) *BlockRing {
+func NewBlockRing(locator Locator, maxSuccessors int, blkTrans BlockTransport, logTrans LogTransport, ch chan<- *rpc.RelocateRPCData) *BlockRing {
 	rs := &BlockRing{
-		locator:  &locatorRouter{Locator: locator},
+		locator:  &locatorRouter{Locator: locator, maxSuccessors: maxSuccessors},
 		blkTrans: blkTrans,
 		logTrans: logTrans,
 	}
@@ -167,12 +168,12 @@ func (br *BlockRing) GetLogBlock(key []byte, opts structs.RequestOptions) (*stru
 
 }
 
-// GetBlockFrom gets a Block from the specified Location
+// GetBlockFrom gets a Block from a specific Location
 func (br *BlockRing) GetBlockFrom(id []byte, loc *structs.Location) (*structs.Block, error) {
 	return br.blkTrans.GetBlock(loc, id)
 }
 
-// GetEntry gets a LogEntryBlock from the ring.
+// GetEntry gets a LogEntryBlock from the ring.  It routes the id around the ring until an entry is found.
 func (br *BlockRing) GetEntry(id []byte, opts structs.RequestOptions) (*structs.Location, *structs.LogEntryBlock, error) {
 
 	var (
@@ -244,23 +245,26 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 			// 1 go-routine per location
 			go func(loc *structs.Location) {
 
-				if atomic.LoadInt32(&bail) == 0 {
+				defer wg.Done()
 
-					if !utils.EqualBytes(loc.Id, opts.Source) {
-						o := structs.RequestOptions{
-							Destination: loc.Id,
-							Source:      opts.Source,
-							PeerSetSize: opts.PeerSetSize,
-							PeerSetKey:  loc.Id,
-						}
-
-						if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
-							errCh <- er
-						}
-					}
-
+				if atomic.LoadInt32(&bail) == 1 {
+					return
 				}
-				wg.Done()
+
+				if utils.EqualBytes(loc.Id, opts.Source) {
+					return
+				}
+
+				o := structs.RequestOptions{
+					Destination: loc.Id,
+					Source:      opts.Source,
+					PeerSetSize: opts.PeerSetSize,
+					PeerSetKey:  loc.Id,
+				}
+				log.Println("CALLING PROPOSE ON", utils.ShortVnodeID(loc.Vnode))
+				if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
+					errCh <- er
+				}
 
 			}(l)
 
@@ -272,20 +276,22 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 
 			go func(loc *structs.Location) {
 
-				if atomic.LoadInt32(&bail) == 0 {
-					o := structs.RequestOptions{
-						Destination: loc.Id,
-						Source:      loc.Id,
-						PeerSetSize: opts.PeerSetSize,
-						PeerSetKey:  loc.Id,
-					}
+				defer wg.Done()
 
-					if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
-						errCh <- er
-					}
+				if atomic.LoadInt32(&bail) == 1 {
+					return
 				}
 
-				wg.Done()
+				o := structs.RequestOptions{
+					Destination: loc.Id,
+					Source:      loc.Id,
+					PeerSetSize: opts.PeerSetSize,
+					PeerSetKey:  loc.Id,
+				}
+				log.Println("CALLING PROPOSE ON", utils.ShortVnodeID(loc.Vnode))
+				if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
+					errCh <- er
+				}
 
 			}(l)
 
@@ -294,7 +300,9 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 	}
 
 	go func() {
+		log.Printf("[TRACE] Waiting propose key=%s id=%x", tx.Key, tx.ID())
 		wg.Wait()
+		log.Printf("[TRACE] Waiting done propose key=%s id=%x", tx.Key, tx.ID())
 		close(done)
 	}()
 
@@ -338,6 +346,7 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 							Source:      opts.Source,
 							PeerSetSize: opts.PeerSetSize,
 						}
+						log.Println("CALLING COMMIT ON", utils.ShortVnodeID(loc.Vnode))
 						if _, er := br.logTrans.CommitEntry(loc, tx, o); er != nil {
 							errCh <- er
 						}
@@ -360,7 +369,7 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 						Destination: loc.Id,
 						PeerSetKey:  loc.Id,
 					}
-
+					log.Println("CALLING COMMIT ON", utils.ShortVnodeID(loc.Vnode))
 					if _, er := br.logTrans.CommitEntry(loc, tx, o); er != nil {
 						errCh <- er
 					}
@@ -373,7 +382,9 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 	}
 
 	go func() {
+		log.Printf("[TRACE] Waiting commit key=%s id=%x", tx.Key, tx.ID())
 		wg.Wait()
+		log.Printf("[TRACE] Waiting done commit key=%s id=%x", tx.Key, tx.ID())
 		close(done)
 	}()
 

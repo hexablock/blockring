@@ -209,6 +209,7 @@ func (t *LogNetTransport) GetEntryRPC(ctx context.Context, req *rpc.BlockRPCData
 	return &rpc.BlockRPCData{}, err
 }
 
+// NewEntryRPC services a NewEntry request
 func (t *LogNetTransport) NewEntryRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
 	tx, err := t.txl.NewEntry(req.ID)
 	if err == nil {
@@ -221,6 +222,7 @@ func (t *LogNetTransport) NewEntryRPC(ctx context.Context, req *rpc.BlockRPCData
 	return &rpc.BlockRPCData{}, err
 }
 
+// ProposeEntryRPC serves a ProposeEntry request
 func (t *LogNetTransport) ProposeEntryRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
 	opts := *req.Options
 
@@ -233,6 +235,7 @@ func (t *LogNetTransport) ProposeEntryRPC(ctx context.Context, req *rpc.BlockRPC
 	return &rpc.BlockRPCData{}, err
 }
 
+// CommitEntryRPC serves a CommitEntry request
 func (t *LogNetTransport) CommitEntryRPC(ctx context.Context, req *rpc.BlockRPCData) (*rpc.BlockRPCData, error) {
 	opts := *req.Options
 	var entry structs.LogEntryBlock
@@ -244,6 +247,7 @@ func (t *LogNetTransport) CommitEntryRPC(ctx context.Context, req *rpc.BlockRPCD
 	return &rpc.BlockRPCData{}, err
 }
 
+// LogRingTransport is a transport to make log requests around the ring based on location.
 type LogRingTransport struct {
 	host   string
 	txl    *hexalog.HexaLog
@@ -251,6 +255,7 @@ type LogRingTransport struct {
 	remote LogTransport
 }
 
+// NewLogRingTransport instantiates a new LogRingTransport to make location based calls around the ring
 func NewLogRingTransport(host string, txl *hexalog.HexaLog, bs hexalog.BlockStore, remote LogTransport) *LogRingTransport {
 	if remote == nil {
 		return &LogRingTransport{host: host, remote: NewLogNetTransportClient(30, 180), txl: txl, bs: bs}
@@ -258,6 +263,7 @@ func NewLogRingTransport(host string, txl *hexalog.HexaLog, bs hexalog.BlockStor
 	return &LogRingTransport{host: host, remote: remote, txl: txl, bs: bs}
 }
 
+// GetLogBlock retrieves a LogBlock from a local or remote Location
 func (lt *LogRingTransport) GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error) {
 	if lt.host == loc.Vnode.Host {
 		lb, err := lt.bs.Get(key)
@@ -266,6 +272,7 @@ func (lt *LogRingTransport) GetLogBlock(loc *structs.Location, key []byte, opts 
 	return lt.remote.GetLogBlock(loc, key, opts)
 }
 
+// ProposeEntry proposes a LogEntryBlock to a local or remote Location
 func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	if lt.host == loc.Vnode.Host {
 		_, err := lt.txl.ProposeEntry(tx, opts)
@@ -283,6 +290,7 @@ func (lt *LogRingTransport) GetEntry(loc *structs.Location, id []byte, opts stru
 	return lt.remote.GetEntry(loc, id, opts)
 }
 
+// NewEntry creates a new LogEntryBlock from the provided Location
 func (lt *LogRingTransport) NewEntry(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
 	if lt.host == loc.Vnode.Host {
 		tx, err := lt.txl.NewEntry(key)
@@ -291,6 +299,7 @@ func (lt *LogRingTransport) NewEntry(loc *structs.Location, key []byte, opts str
 	return lt.remote.NewEntry(loc, key, opts)
 }
 
+// CommitEntry commits the LogEntryBlock to the specified Location
 func (lt *LogRingTransport) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	if lt.host == loc.Vnode.Host {
 		return &structs.Location{}, lt.txl.CommitEntry(tx, opts)

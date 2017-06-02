@@ -11,6 +11,7 @@ import (
 // BlockStore implements a block storage interface
 type BlockStore interface {
 	GetBlock(id []byte) (*structs.Block, error)
+	RemoveBlock(id []byte) error
 	SetBlock(block *structs.Block) error
 	// Marks a block to be released from the store.
 	ReleaseBlock(id []byte) error

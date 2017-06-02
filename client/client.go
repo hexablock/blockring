@@ -63,7 +63,7 @@ func NewClient(conf *Config) (*Client, error) {
 
 	blkTrans := blockring.NewBlockNetTransportClient(conf.ReapInterval, conf.MaxIdle)
 	logTrans := blockring.NewLogNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	c.rs = blockring.NewBlockRing(c, blkTrans, logTrans, nil)
+	c.rs = blockring.NewBlockRing(c, int(resp.Successors), blkTrans, logTrans, nil)
 
 	return c, nil
 }

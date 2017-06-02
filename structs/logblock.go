@@ -152,6 +152,18 @@ func (t *LogBlock) ContainsEntry(h []byte) bool {
 	return false
 }
 
+// RemoveEntry removes all entries from the block after the provided id.
+func (t *LogBlock) RemoveEntry(id []byte) error {
+	for i, e := range t.Entries {
+		if utils.EqualBytes(e, id) {
+			t.Entries = t.Entries[:i]
+			break
+		}
+	}
+
+	return utils.ErrNotFound
+}
+
 // AppendEntry appends a transaction id to the block and re-calculates the merkle root if it is not found.
 // If the tx id already exists it simply returns
 func (t *LogBlock) AppendEntry(entry *LogEntryBlock) error {

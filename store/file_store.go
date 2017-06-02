@@ -15,6 +15,8 @@ import (
 	"github.com/hexablock/blockring/utils"
 )
 
+// FileBlockStore implements a file based block store.  All writes occur on the in-memory buffer
+// which is then flushed at a later interval.
 type FileBlockStore struct {
 	datadir        string
 	defaultSetPerm os.FileMode
@@ -24,15 +26,30 @@ type FileBlockStore struct {
 	flushInterval time.Duration
 }
 
+// NewFileBlockStore instantiates a new FileBlockStore setting the defaults permissions, flush interval
+// provided data directory.
 func NewFileBlockStore(datadir string) *FileBlockStore {
 	fbs := &FileBlockStore{
 		datadir:        datadir,
 		defaultSetPerm: 0444,
-		flushInterval:  30 * time.Second,
+		flushInterval:  20 * time.Second,
 		buf:            make(map[string]*structs.Block),
 	}
 	go fbs.flushBlocks()
 	return fbs
+}
+
+// RemoveBlock removes a Block from the in-mem buffer as well as stable store.
+func (st *FileBlockStore) RemoveBlock(id []byte) error {
+	p := st.abspath(hex.EncodeToString(id))
+	err := os.Remove(p)
+
+	st.mu.Lock()
+	if _, ok := st.buf[string(id)]; ok {
+		delete(st.buf, string(id))
+	}
+	st.mu.Unlock()
+	return err
 }
 
 // GetBlock returns a block with the given id if it exists
@@ -48,7 +65,9 @@ func (st *FileBlockStore) GetBlock(id []byte) (*structs.Block, error) {
 	return st.readBlockFromFile(ap)
 }
 
+// IterIDs iterates over all block ids
 func (st *FileBlockStore) IterIDs(f func(id []byte) error) error {
+	// Traverse in-mem blocks
 	i := 0
 	st.mu.RLock()
 	inMem := make([][]byte, len(st.buf))
@@ -64,6 +83,7 @@ func (st *FileBlockStore) IterIDs(f func(id []byte) error) error {
 		}
 	}
 
+	// Traverse all block files
 	files, err := ioutil.ReadDir(st.datadir)
 	if err != nil {
 		return err

@@ -97,6 +97,7 @@ func (s *ChordDelegate) takeoverBlock(id []byte, req *rpc.RelocateRPCData) {
 
 func (s *ChordDelegate) takeoverOrRouteBlock(b *rpc.RelocateRPCData) error {
 	id := b.ID
+
 	locs, err := s.ring.LocateReplicatedHash(id, 1)
 	if err != nil {
 		return err
@@ -122,17 +123,18 @@ func (s *ChordDelegate) takeoverOrRouteBlock(b *rpc.RelocateRPCData) error {
 func (s *ChordDelegate) startConsuming() {
 	for b := range s.InBlocks {
 
-		var err error
+		//var err error
 		if b.Block != nil && b.Block.Type == structs.BlockType_LOG {
 			//err = s.takeoverOrRouteLogBlock(b)
 			s.takeoverLogBlock(b.ID, b.Source)
 		} else {
-			err = s.takeoverOrRouteBlock(b)
+			//err = s.takeoverOrRouteBlock(b)
+			s.takeoverBlock(b.ID, b)
 		}
 
-		if err != nil {
-			log.Println("[ERROR]", err)
-		}
+		// if err != nil {
+		// 	log.Println("[ERROR]", err)
+		// }
 
 	}
 }
