@@ -62,16 +62,15 @@ func (cr *ChordRing) LookupHash(hash []byte, n int) (*chord.Vnode, []*chord.Vnod
 	return cr.ring.LookupHash(n, hash)
 }
 
-// LocateReplicatedKey returns vnodes where a key and replicas are located.
+// LocateReplicatedKey returns vnodes where a key and n replicas are located.
 func (cr *ChordRing) LocateReplicatedKey(key []byte, n int) ([]*structs.Location, error) {
 	hash := fastsha256.Sum256(key)
 	return cr.LocateReplicatedHash(hash[:], n)
 }
 
-// LocateReplicatedHash returns vnodes where a key and replicas are located.
+// LocateReplicatedHash returns vnodes where a key and n replicas are located.
 func (cr *ChordRing) LocateReplicatedHash(hash []byte, n int) ([]*structs.Location, error) {
 	hashes := utils.ReplicaHashes(hash, n)
-	//out := make([]*structs.Location, n)
 	out := map[string]*structs.Location{}
 
 	for i, h := range hashes {

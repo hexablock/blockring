@@ -117,13 +117,9 @@ func (c *LogNetTransportClient) TransferLogBlock(key []byte, src, dst *structs.L
 	c.out.Return(conn)
 
 	return err
-	// if err == nil {
-	// 	return resp.Location, nil
-	// }
-	//
-	// return nil, err
 }
 
+// CommitEntry makes a CommitEntry request to the Location
 func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 
 	blk, err := tx.EncodeBlock()
@@ -229,8 +225,13 @@ func (t *LogNetTransport) ProposeEntryRPC(ctx context.Context, req *rpc.BlockRPC
 	var entry structs.LogEntryBlock
 	err := entry.UnmarshalBinary(req.Block.Data)
 	if err == nil {
-		_, err = t.txl.ProposeEntry(&entry, opts)
+		//var ballot *hexalog.Ballot
+		if _, err = t.txl.ProposeEntry(&entry, opts); err == nil {
+			//log.Printf("Waiting on ballot: %p", ballot)
+			//err = ballot.Wait()
+		}
 	}
+	//log.Println("Returning from ProposeEntryRPC")
 
 	return &rpc.BlockRPCData{}, err
 }
