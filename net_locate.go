@@ -51,6 +51,8 @@ func (ls *LookupServiceClient) LookupKey(host string, key []byte, n int) ([]byte
 
 	return resp.KeyHash, resp.Predecessor, resp.Successors, nil
 }
+
+// LocateReplicatedKey makes a LocateReplicatedKey RPC request to the host
 func (ls *LookupServiceClient) LocateReplicatedKey(host string, key []byte, r int) ([]*structs.Location, error) {
 	conn, err := ls.out.Get(host)
 	if err != nil {
@@ -66,6 +68,7 @@ func (ls *LookupServiceClient) LocateReplicatedKey(host string, key []byte, r in
 	}
 	return resp.Locations, err
 }
+
 func (ls *LookupServiceClient) LocateReplicatedHash(host string, hash []byte, r int) ([]*structs.Location, error) {
 	conn, err := ls.out.Get(host)
 	if err != nil {

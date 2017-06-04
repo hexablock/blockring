@@ -20,9 +20,8 @@ type ChordDelegate struct {
 
 	ring      *ChordRing
 	blockRing *BlockRing
-
+	// Overall config
 	conf *Config
-
 	// Incoming candidate blocks to be locally stored i.e. taken over. These are either stored or
 	// forwarded based on location ID
 	InBlocks chan *rpc.RelocateRPCData
@@ -33,7 +32,7 @@ type ChordDelegate struct {
 func NewChordDelegate(peerStore store.PeerStore, conf *Config) *ChordDelegate {
 	return &ChordDelegate{
 		conf:      conf,
-		InBlocks:  make(chan *rpc.RelocateRPCData, conf.InBlockBufSize),
+		InBlocks:  make(chan *rpc.RelocateRPCData, conf.BlockBufferSize),
 		peerStore: peerStore,
 	}
 }

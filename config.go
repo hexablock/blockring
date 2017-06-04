@@ -13,20 +13,25 @@ import (
 	"github.com/hexablock/blockring/utils"
 )
 
-const defaultNumSuccessors = 7
+const (
+	defaultNumSuccessors        = 7
+	defaultNumVnodes            = 3
+	defaultStabilizeMinMilliSec = 5000
+	defaultStabilizeMaxMilliSec = 15000
+
+	defaultRequiredVotes = 3
+)
 
 // Config holds the overall config
 type Config struct {
-	Chord *chord.Config
-
-	BindAddr       string       // Bind address
-	AdvAddr        string       // Advertise address used by peers
-	Peers          []string     // Existing peers to join
-	RetryJoin      bool         // keep trying peers on failure
-	Timeouts       *NetTimeouts // Network timeouts
-	InBlockBufSize int
-
-	RequiredVotes int
+	Chord           *chord.Config // Chord configuration
+	BindAddr        string        // Bind address
+	AdvAddr         string        // Advertise address used by peers
+	Peers           []string      // Existing peers to join
+	RetryJoin       bool          // keep trying peers on failure
+	Timeouts        *NetTimeouts  // Network call timeouts
+	BlockBufferSize int           // Input block buffer
+	RequiredVotes   int           // Votes required for consensus
 }
 
 // DefaultConfig returns a sane config
@@ -34,16 +39,16 @@ func DefaultConfig() *Config {
 	c := &Config{
 		Chord:         chord.DefaultConfig(""),
 		Timeouts:      DefaultNetTimeouts(),
-		RequiredVotes: 3,
+		RequiredVotes: defaultRequiredVotes,
 	}
 
 	c.Chord.NumSuccessors = defaultNumSuccessors
-	c.Chord.NumVnodes = 3
-	c.Chord.StabilizeMin = 3 * time.Second
-	c.Chord.StabilizeMax = 10 * time.Second
+	c.Chord.NumVnodes = defaultNumVnodes
+	c.Chord.StabilizeMin = defaultStabilizeMinMilliSec * time.Millisecond
+	c.Chord.StabilizeMax = defaultStabilizeMaxMilliSec * time.Millisecond
 	c.Chord.HashFunc = func() hash.Hash { return fastsha256.New() }
 
-	c.InBlockBufSize = c.Chord.NumSuccessors * c.Chord.NumVnodes
+	c.BlockBufferSize = c.Chord.NumSuccessors * c.Chord.NumVnodes
 
 	return c
 }

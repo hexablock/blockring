@@ -79,8 +79,8 @@ func (cr *ChordRing) LocateReplicatedHash(hash []byte, n int) ([]*structs.Locati
 		if err != nil {
 			return nil, err
 		}
-		// If we already have the current host location, go through the successors to find the
-		// next best location
+		// If we already have the host location, go through the successors to find the
+		// next best location that we don't have.
 		for _, vn := range vs {
 			if _, ok := out[vn.Host]; !ok {
 				out[vn.Host] = &structs.Location{Id: h, Vnode: vn, Priority: int32(i)}
@@ -88,11 +88,12 @@ func (cr *ChordRing) LocateReplicatedHash(hash []byte, n int) ([]*structs.Locati
 			}
 		}
 	}
-
+	// Return if we don't have the requested count
 	if len(out) != n {
 		return nil, fmt.Errorf("not enough hosts found")
 	}
 
+	// Re-arrange by highest priority
 	o := make([]*structs.Location, n)
 	for _, v := range out {
 		o[v.Priority] = v

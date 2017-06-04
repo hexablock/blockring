@@ -38,7 +38,7 @@ type BlockRing struct {
 	proxShiftEnabled bool                        // Proximity shifting
 }
 
-// NewBlockRing instantiates an instance.  If the channel is not nil, proximity shifting is
+// NewBlockRing instantiates an instance of BlockRing.  If the channel is not nil, proximity shifting is
 // automatically enabled.
 func NewBlockRing(locator Locator, maxSuccessors int, blkTrans BlockTransport, logTrans LogTransport, ch chan<- *rpc.RelocateRPCData) *BlockRing {
 	rs := &BlockRing{
