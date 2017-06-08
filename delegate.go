@@ -29,6 +29,7 @@ type ChordDelegate struct {
 	peerStore store.PeerStore
 }
 
+// NewChordDelegate instantiates a new ChordDelegate with the supplied PeerStore and config.
 func NewChordDelegate(peerStore store.PeerStore, conf *Config) *ChordDelegate {
 	return &ChordDelegate{
 		conf:      conf,
@@ -94,46 +95,39 @@ func (s *ChordDelegate) takeoverBlock(id []byte, req *rpc.RelocateRPCData) {
 // 	return nil
 // }
 
-func (s *ChordDelegate) takeoverOrRouteBlock(b *rpc.RelocateRPCData) error {
-	id := b.ID
-
-	locs, err := s.ring.LocateReplicatedHash(id, 1)
-	if err != nil {
-		return err
-	}
-
-	loc := locs[0]
-	if loc.Vnode.Host == s.ring.Hostname() {
-		s.takeoverBlock(id, b)
-	} else {
-		// Re-route to primary
-		log.Printf("[DEBUG] action=route phase=begin block=%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
-		if err = s.Store.remote.TransferBlock(id, b.Source, loc); err != nil {
-			log.Printf("[ERROR] action=route phase=failed block=%x dst=%s msg='%v'", id, utils.ShortVnodeID(loc.Vnode), err)
-		} else {
-			log.Printf("[DEBUG] action=route phase=complete block=%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
-		}
-	}
-	return nil
-}
+// func (s *ChordDelegate) takeoverOrRouteBlock(b *rpc.RelocateRPCData) error {
+// 	id := b.ID
+//
+// 	locs, err := s.ring.LocateReplicatedHash(id, 1)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	loc := locs[0]
+// 	if loc.Vnode.Host == s.ring.Hostname() {
+// 		s.takeoverBlock(id, b)
+// 	} else {
+// 		// Re-route to primary
+// 		log.Printf("[DEBUG] action=route phase=begin block=%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
+// 		if err = s.Store.remote.TransferBlock(id, b.Source, loc); err != nil {
+// 			log.Printf("[ERROR] action=route phase=failed block=%x dst=%s msg='%v'", id, utils.ShortVnodeID(loc.Vnode), err)
+// 		} else {
+// 			log.Printf("[DEBUG] action=route phase=complete block=%x dst=%s", id, utils.ShortVnodeID(loc.Vnode))
+// 		}
+// 	}
+// 	return nil
+// }
 
 // StartConsuming takes incoming blocks and adds them to the local store if they fall within the perview
 // of the host or are transferred to the predecessor.
 func (s *ChordDelegate) startConsuming() {
 	for b := range s.InBlocks {
 
-		//var err error
 		if b.Block != nil && b.Block.Type == structs.BlockType_LOG {
-			//err = s.takeoverOrRouteLogBlock(b)
 			s.takeoverLogBlock(b.ID, b.Source)
 		} else {
-			//err = s.takeoverOrRouteBlock(b)
 			s.takeoverBlock(b.ID, b)
 		}
-
-		// if err != nil {
-		// 	log.Println("[ERROR]", err)
-		// }
 
 	}
 }
@@ -141,9 +135,6 @@ func (s *ChordDelegate) startConsuming() {
 func (s *ChordDelegate) transferLogBlocks(local, remote *chord.Vnode) error {
 
 	return s.LogTrans.bs.IterKeys(func(key []byte) error {
-		//
-		// Handle transferring natural keys.
-		//
 
 		hashes := utils.ReplicatedKeyHashes(key, s.conf.RequiredVotes)
 		for _, h := range hashes {
@@ -166,10 +157,6 @@ func (s *ChordDelegate) transferLogBlocks(local, remote *chord.Vnode) error {
 			break
 		}
 
-		//
-		// TODO: handle replicas
-		//
-
 		return nil
 	})
 }
@@ -182,9 +169,6 @@ func (s *ChordDelegate) transferBlocks(local, remote *chord.Vnode) error {
 		if bytes.Compare(id, remote.Id) >= 0 {
 			return nil
 		}
-		//
-		// Handle transferring natural keys.
-		//
 
 		src := &structs.Location{Id: id, Vnode: local}
 		dst := &structs.Location{Id: id, Vnode: remote}

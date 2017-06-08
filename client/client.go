@@ -38,6 +38,8 @@ type Client struct {
 	conf   *Config
 	locate *blockring.LookupServiceClient
 	rs     *blockring.BlockRing
+
+	logTrans blockring.LogTransport
 }
 
 // NewClient instantiates a new client
@@ -62,8 +64,8 @@ func NewClient(conf *Config) (*Client, error) {
 	}
 
 	blkTrans := blockring.NewBlockNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	logTrans := blockring.NewLogNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	c.rs = blockring.NewBlockRing(c, int(resp.Successors), blkTrans, logTrans, nil)
+	c.logTrans = blockring.NewLogNetTransportClient(conf.ReapInterval, conf.MaxIdle)
+	c.rs = blockring.NewBlockRing(c, int(resp.Successors), blkTrans, c.logTrans, nil)
 
 	return c, nil
 }
@@ -91,11 +93,21 @@ func (client *Client) LocateReplicatedKey(key []byte, r int) ([]*structs.Locatio
 	return client.locate.LocateReplicatedKey(client.GetPeer(), key, r)
 }
 
+// NewEntry retrieves a new LogEntryBlock that would be next in the chain.
 func (client *Client) NewEntry(key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error) {
 	return client.rs.NewEntry(key, opts)
 }
-func (client *Client) ProposeEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
-	return client.rs.ProposeEntry(tx, opts)
+
+// ProposeEntry submits a ProposeEntry request to the network.
+func (client *Client) ProposeEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) error {
+	//return client.rs.ProposeEntry(tx, opts)
+
+	locs, err := client.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
+	if err != nil {
+		return err
+	}
+
+	return client.logTrans.ProposeEntry(locs[0], tx, opts)
 }
 
 // GetLogBlock gets the first LogBlock of the given key
@@ -111,9 +123,4 @@ func (client *Client) SetBlock(block *structs.Block, opts ...structs.RequestOpti
 // GetBlock gets a block given the id.  It returns the first available block.
 func (client *Client) GetBlock(id []byte, opts ...structs.RequestOptions) (*structs.Location, *structs.Block, error) {
 	return client.rs.GetBlock(id, opts...)
-}
-
-// GetBlockFrom tries to retrieve a Block from a specific location.
-func (client *Client) GetBlockFrom(id []byte, loc *structs.Location) (*structs.Block, error) {
-	return client.rs.GetBlockFrom(id, loc)
 }

@@ -18,6 +18,7 @@ func NewLookupServiceClient(reapInterval, maxIdle int) *LookupServiceClient {
 	return &LookupServiceClient{out: pool.NewOutConnPool(reapInterval, maxIdle)}
 }
 
+// LookupHash performs a hash lookup on the host
 func (ls *LookupServiceClient) LookupHash(host string, hash []byte, n int) (*chord.Vnode, []*chord.Vnode, error) {
 	conn, err := ls.out.Get(host)
 	if err != nil {
@@ -35,6 +36,7 @@ func (ls *LookupServiceClient) LookupHash(host string, hash []byte, n int) (*cho
 	return resp.Predecessor, resp.Successors, nil
 }
 
+// LookupKey performs a key lookup on the host
 func (ls *LookupServiceClient) LookupKey(host string, key []byte, n int) ([]byte, *chord.Vnode, []*chord.Vnode, error) {
 	conn, err := ls.out.Get(host)
 	if err != nil {
@@ -85,6 +87,7 @@ func (ls *LookupServiceClient) LocateReplicatedHash(host string, hash []byte, r 
 	return resp.Locations, err
 }
 
+// Negotiate negotiates various parameters from the network when a new Client is instantiated
 func (ls *LookupServiceClient) Negotiate(host string) (*rpc.NegotiateResponse, error) {
 	conn, err := ls.out.Get(host)
 	if err != nil {

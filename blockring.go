@@ -1,9 +1,6 @@
 package blockring
 
 import (
-	"sync"
-	"sync/atomic"
-
 	"github.com/hexablock/blockring/rpc"
 	"github.com/hexablock/blockring/structs"
 	"github.com/hexablock/blockring/utils"
@@ -13,8 +10,8 @@ import (
 type LogTransport interface {
 	GetEntry(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error)
 	NewEntry(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogEntryBlock, *structs.Location, error)
-	ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
-	CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error)
+	ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) error
+	CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) error
 	GetLogBlock(loc *structs.Location, key []byte, opts structs.RequestOptions) (*structs.LogBlock, *structs.Location, error)
 	TransferLogBlock(key []byte, src, dst *structs.Location) error
 }
@@ -112,19 +109,20 @@ func (br *BlockRing) GetBlock(id []byte, opts ...structs.RequestOptions) (*struc
 			err = utils.ErrNotFound
 		}
 
-		/*if loc.Priority > 0 && br.proxShiftEnabled {
-			br.ch <- &rpc.BlockRPCData{
-				Block: blk,
-				Location: loc,
-			}
-		}*/
+		if loc.Priority > 0 && br.proxShiftEnabled {
+			// br.ch <- &rpc.BlockRPCData{
+			// 	Block: blk,
+			// 	Location: loc,
+			// }
+		}
 
 	}
 
 	return loc, blk, err
 }
 
-// GetRootBlock gets a root block with the given id
+// GetRootBlock gets a root block with the given id.  It is a helper function that simply decodes a
+// Block into a RootBlock
 func (br *BlockRing) GetRootBlock(id []byte, opts ...structs.RequestOptions) (*structs.Location, *structs.RootBlock, error) {
 	loc, block, err := br.GetBlock(id, opts...)
 	if err == nil {
@@ -157,21 +155,16 @@ func (br *BlockRing) GetLogBlock(key []byte, opts structs.RequestOptions) (*stru
 			err = utils.ErrNotFound
 		}
 
-		/*if loc.Priority > 0 && br.proxShiftEnabled {
-			br.ch <- &rpc.BlockRPCData{
-				Block: blk,
-				Location: loc,
-			}
-		}*/
+		if loc.Priority > 0 && br.proxShiftEnabled {
+			// br.ch <- &rpc.BlockRPCData{
+			// 	Block: blk,
+			// 	Location: loc,
+			// }
+		}
 	}
 
 	return loc, blk, err
 
-}
-
-// GetBlockFrom gets a Block from a specific Location
-func (br *BlockRing) GetBlockFrom(id []byte, loc *structs.Location) (*structs.Block, error) {
-	return br.blkTrans.GetBlock(loc, id)
 }
 
 // GetEntry gets a LogEntryBlock from the ring.  It routes the id around the ring until an entry is found.
@@ -186,8 +179,10 @@ func (br *BlockRing) GetEntry(id []byte, opts structs.RequestOptions) (*structs.
 		if b, _, err := br.logTrans.GetEntry(l, id, opts); err == nil {
 			blk = b
 			loc = l
+			// Found so stop routing
 			return false
 		}
+		// Continue routing
 		return true
 	})
 
@@ -196,12 +191,12 @@ func (br *BlockRing) GetEntry(id []byte, opts structs.RequestOptions) (*structs.
 			err = utils.ErrNotFound
 		}
 
-		/*if loc.Priority > 0 && br.proxShiftEnabled {
-			br.ch <- &rpc.BlockRPCData{
-				Block: blk,
-				Location: loc,
-			}
-		}*/
+		//if loc.Priority > 0 && br.proxShiftEnabled {
+		// br.ch <- &rpc.BlockRPCData{
+		// 	Block: blk,
+		// 	Location: loc,
+		// }
+		//}
 	}
 
 	return loc, blk, err
@@ -229,7 +224,7 @@ func (br *BlockRing) NewEntry(key []byte, opts structs.RequestOptions) (*structs
 }
 
 // ProposeEntry proposes a transaction to the network.
-func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
+/*func (br *BlockRing) ProposeEntrySync(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 
 	locs, err := br.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
@@ -269,7 +264,7 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 					PeerSetKey:  loc.Id,
 				}
 				//log.Println("CALLING PROPOSE ON", utils.ShortVnodeID(loc.Vnode))
-				if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
+				if er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 					errCh <- er
 				}
 
@@ -296,7 +291,7 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 					PeerSetKey:  loc.Id,
 				}
 				//log.Println("CALLING PROPOSE ON", utils.ShortVnodeID(loc.Vnode))
-				if _, er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
+				if er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 					errCh <- er
 				}
 
@@ -320,10 +315,10 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 	}
 
 	return meta, err
-}
+}*/
 
 // CommitEntry tries to commit an entry
-func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
+/*func (br *BlockRing) CommitEntrySync(tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
 	locs, err := br.locator.LocateReplicatedKey(tx.Key, int(opts.PeerSetSize))
 	if err != nil {
 		return nil, err
@@ -402,4 +397,4 @@ func (br *BlockRing) CommitEntry(tx *structs.LogEntryBlock, opts structs.Request
 	}
 
 	return meta, err
-}
+}*/

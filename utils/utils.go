@@ -16,6 +16,7 @@ var keyspaceSize = new(big.Int).SetBytes([]byte{
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 })
 
+// ErrNotFound is a generic not found helper error
 var ErrNotFound = errors.New("not found")
 
 // ReplicatedKeyHashes calculates all hashes for a replicated key.
@@ -37,7 +38,7 @@ func ReplicatedKeyHashes(key []byte, r int) [][]byte {
 func ReplicaHashes(startHash []byte, r int) [][]byte {
 	out := make([][]byte, r)
 	out[0] = startHash
-
+	// Get int values returning a byte slice representation.
 	rsp := CalculateReplicaHashes(startHash, r)
 	for i, v := range rsp {
 		out[i+1] = v.Bytes()
@@ -45,8 +46,8 @@ func ReplicaHashes(startHash []byte, r int) [][]byte {
 	return out
 }
 
-// CalculateReplicaHashes computes r-1 additional hashes around the ring for the given hash and returns
-// the respective int values.
+// CalculateReplicaHashes computes r-1 additional hashes for a hash and returns respective int values.
+// It divides the keyspace into r slices starting at provided hash.
 func CalculateReplicaHashes(hash []byte, r int) []*big.Int {
 	replicas := big.NewInt(int64(r))
 	width := new(big.Int).Div(keyspaceSize, replicas)

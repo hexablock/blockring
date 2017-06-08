@@ -20,25 +20,25 @@ func NewLogNetTransportClient(reapInterval, maxIdle int) *LogNetTransportClient 
 }
 
 // ProposeEntry makes an ProposeEntry rpc call to a location.
-func (c *LogNetTransportClient) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
+func (c *LogNetTransportClient) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) error {
 
 	blk, err := tx.EncodeBlock()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req := &rpc.BlockRPCData{Block: blk, Options: &opts}
-	resp, err := conn.LogRPC.ProposeEntryRPC(context.Background(), req)
+	_, err = conn.LogRPC.ProposeEntryRPC(context.Background(), req)
 	c.out.Return(conn)
-	if err == nil {
-		return resp.Location, nil
-	}
-	return nil, err
+	//if err == nil {
+	//return  nil
+	//}
+	return err
 }
 
 // NewEntry makes a new a entry request to Location for key
@@ -120,25 +120,22 @@ func (c *LogNetTransportClient) TransferLogBlock(key []byte, src, dst *structs.L
 }
 
 // CommitEntry makes a CommitEntry request to the Location
-func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
+func (c *LogNetTransportClient) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) error {
 
 	blk, err := tx.EncodeBlock()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	conn, err := c.out.Get(loc.Vnode.Host)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req := &rpc.BlockRPCData{Block: blk, Options: &opts}
-	resp, err := conn.LogRPC.CommitEntryRPC(context.Background(), req)
+	_, err = conn.LogRPC.CommitEntryRPC(context.Background(), req)
 	c.out.Return(conn)
-	if err == nil {
-		return resp.Location, nil
-	}
-	return nil, err
+	return err
 }
 
 // LogNetTransport is the network transport for the consensus log.
@@ -274,10 +271,10 @@ func (lt *LogRingTransport) GetLogBlock(loc *structs.Location, key []byte, opts 
 }
 
 // ProposeEntry proposes a LogEntryBlock to a local or remote Location
-func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
+func (lt *LogRingTransport) ProposeEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) error {
 	if lt.host == loc.Vnode.Host {
 		_, err := lt.txl.ProposeEntry(tx, opts)
-		return &structs.Location{}, err
+		return err
 	}
 	return lt.remote.ProposeEntry(loc, tx, opts)
 }
@@ -301,9 +298,9 @@ func (lt *LogRingTransport) NewEntry(loc *structs.Location, key []byte, opts str
 }
 
 // CommitEntry commits the LogEntryBlock to the specified Location
-func (lt *LogRingTransport) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) (*structs.Location, error) {
+func (lt *LogRingTransport) CommitEntry(loc *structs.Location, tx *structs.LogEntryBlock, opts structs.RequestOptions) error {
 	if lt.host == loc.Vnode.Host {
-		return &structs.Location{}, lt.txl.CommitEntry(tx, opts)
+		return lt.txl.CommitEntry(tx, opts)
 	}
 	return lt.remote.CommitEntry(loc, tx, opts)
 }
