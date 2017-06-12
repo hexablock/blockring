@@ -14,6 +14,12 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 		return err
 	}
 
+	//var wg sync.WaitGroup
+	//wg.Add(len(locs))
+
+	//errs := make(chan error, len(locs))
+	//done := make(chan struct{}, len(locs))
+
 	if opts.Source != nil && len(opts.Source) > 0 {
 		// Broadcast to all vnodes skipping the source.
 		for _, l := range locs {
@@ -28,8 +34,10 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 				}
 				if er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 					log.Println("[ERROR] Propose", er)
+					//errs <- er
 				}
 
+				//wg.Done()
 			}(l)
 
 		}
@@ -48,15 +56,27 @@ func (br *BlockRing) ProposeEntry(tx *structs.LogEntryBlock, opts structs.Reques
 				}
 				if er := br.logTrans.ProposeEntry(loc, tx, o); er != nil {
 					log.Println("[ERROR] Propose", er)
+					//errs <- er
 				}
 
+				//wg.Done()
 			}(l)
 
 		}
 
 	}
 
-	return nil
+	// go func() {
+	// 	wg.Wait()
+	// 	close(done)
+	// }()
+	//
+	// select {
+	// case err = <-errs:
+	// case <-done:
+	// }
+
+	return err
 }
 
 // CommitEntry locates partipicating voters for the LogEntryBlock and asynchronously submits a commit

@@ -35,39 +35,42 @@ func (conf *Config) SetPeers(peers string) {
 
 // Client is a client connecting to the core cluster
 type Client struct {
-	conf   *Config
-	locate *blockring.LookupServiceClient
-	rs     *blockring.BlockRing
-
+	conf     *Config
+	locate   *blockring.LookupServiceClient
 	logTrans blockring.LogTransport
+	rs       *blockring.BlockRing
 }
 
 // NewClient instantiates a new client
-func NewClient(conf *Config) (*Client, error) {
-	if len(conf.Peers) == 0 {
-		return nil, fmt.Errorf("no peers found")
+func NewClient(conf *Config) *Client {
+	return &Client{
+		conf:     conf,
+		locate:   blockring.NewLookupServiceClient(conf.ReapInterval, conf.MaxIdle),
+		logTrans: blockring.NewLogNetTransportClient(conf.ReapInterval, conf.MaxIdle),
+	}
+}
+
+// Configure negotiates ring parameters with peers and sets up the BlockRing.  This must be called
+// before using the client.
+func (client *Client) Configure() error {
+	if len(client.conf.Peers) == 0 {
+		return fmt.Errorf("no peers found")
 	}
 
-	c := &Client{
-		conf:   conf,
-		locate: blockring.NewLookupServiceClient(conf.ReapInterval, conf.MaxIdle),
-	}
-
-	resp, err := c.locate.Negotiate(c.GetPeer())
+	resp, err := client.locate.Negotiate(client.GetPeer())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	isucc := int(resp.Successors)
-	if conf.MaxSuccessors == 0 || conf.MaxSuccessors > isucc {
-		c.conf.MaxSuccessors = isucc
+	if client.conf.MaxSuccessors == 0 || client.conf.MaxSuccessors > isucc {
+		client.conf.MaxSuccessors = isucc
 	}
 
-	blkTrans := blockring.NewBlockNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	c.logTrans = blockring.NewLogNetTransportClient(conf.ReapInterval, conf.MaxIdle)
-	c.rs = blockring.NewBlockRing(c, int(resp.Successors), blkTrans, c.logTrans, nil)
+	blkTrans := blockring.NewBlockNetTransportClient(client.conf.ReapInterval, client.conf.MaxIdle)
+	client.rs = blockring.NewBlockRing(client, int(resp.Successors), blkTrans, client.logTrans, nil)
 
-	return c, nil
+	return nil
 }
 
 // GetPeer returns a single random peer

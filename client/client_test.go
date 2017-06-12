@@ -11,7 +11,8 @@ func TestClient(t *testing.T) {
 	conf := DefaultConfig()
 	conf.SetPeers("127.0.0.1:10123")
 
-	client, err := NewClient(conf)
+	client := NewClient(conf)
+	err := client.Configure()
 	if err != nil {
 		t.Fatal(err)
 	}

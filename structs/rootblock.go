@@ -62,6 +62,7 @@ func (idx *RootBlock) Len() int {
 // MarshalJSON is a custom json marshaller to handle hashes
 func (idx *RootBlock) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
+		"ID":        hex.EncodeToString(idx.ID()),
 		"Type":      BlockType_ROOT,
 		"Size":      idx.size,
 		"BlockSize": idx.blockSize,
